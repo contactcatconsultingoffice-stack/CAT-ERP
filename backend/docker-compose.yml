@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: cat-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cat_erp
+      POSTGRES_PASSWORD: cat_erp
+      POSTGRES_DB: cat_erp
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+

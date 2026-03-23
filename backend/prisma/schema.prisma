@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  name              String?
+  passwordHash      String?
+  resetToken        String?
+  resetTokenExpires DateTime?
+  role              UserRole @default(COLLABORATOR)
+  isSuperAdmin      Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  permissions       String[] @default([]) // e.g. ["clients", "projects"]
+
+  collaborator Collaborator?
+  auditLogs    AuditLog[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  action    String   // e.g. LOGIN, CREATE, UPDATE, DELETE
+  entity    String   // e.g. PROJECT, CLIENT, CONTACT, FINANCIAL
+  entityId  String?
+  details   String?  // Optional context
+  createdAt DateTime @default(now())
+}
+
+model Collaborator {
+  id           String   @id @default(cuid())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String   @unique
+  expertise    String?  // Design, Dev, Stratégie, etc.
+  socialHandle String?  // LinkedIn or others
+  phone        String?
+
+  missions Mission[]
+}
+
+model Partner {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  reference   String?       @unique     // e.g. PRJ-2026-001
+  name        String
+  type        ProjectType
+  status      ProjectStatus @default(PLANNING)
+  priority    Priority      @default(MEDIUM)
+  client      Client        @relation(fields: [clientId], references: [id])
+  clientId    String
+  partner     Partner?      @relation(fields: [partnerId], references: [id])
+  partnerId   String?
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  financialRecords FinancialRecord[]
+  missions         Mission[]
+  contracts        Contract[]
+}
+
+model FinancialRecord {
+  id           String          @id @default(cuid())
+  kind         FinancialKind
+  amountHT     Decimal
+  amountTTC    Decimal
+  currency     String          @default("TND")
+  status       PaymentStatus   @default(PENDING)
+  dueDate      DateTime?
+  issuedAt     DateTime        @default(now())
+  project      Project         @relation(fields: [projectId], references: [id])
+  projectId    String
+  externalRef  String?         // e.g. QUO-1769...
+  lines        Json?           // Stores invoice lines
+  paymentTerms String?
+
+  contracts Contract[]
+}
+
+model Contract {
+  id             String          @id @default(cuid())
+  type           ContractType
+  title          String
+  rawText        String          // Exact texte contractuel stocké
+  signedAt       DateTime?
+  location       String?
+  project        Project?        @relation(fields: [projectId], references: [id])
+  projectId      String?
+  financial      FinancialRecord? @relation(fields: [financialId], references: [id])
+  financialId    String?
+  createdAt      DateTime        @default(now())
+}
+
+model Mission {
+  id            String       @id @default(cuid())
+  project       Project      @relation(fields: [projectId], references: [id])
+  projectId     String
+  collaborator  Collaborator @relation(fields: [collaboratorId], references: [id], onDelete: Cascade)
+  collaboratorId String
+  description   String
+  hours         Float
+  performedAt   DateTime     @default(now())
+}
+
+model Prospect {
+  id        String         @id @default(cuid())
+  name      String
+  contact   String?
+  email     String?
+  status    ProspectStatus @default(A_CONTACTER)
+  notes     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  COLLABORATOR
+}
+
+enum ProjectType {
+  PORTFOLIO
+  BLOG
+  ECOMMERCE
+  APPLICATION
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum ProspectStatus {
+  A_CONTACTER
+  CONTACTE
+  REPONDU
+  EN_DISCUSSION
+  CONFIRME
+}
+
+enum FinancialKind {
+  QUOTE
+  INVOICE
+}
+
+enum PaymentStatus {
+  READY_TO_SEND
+  SENT
+  PENDING
+  PAID
+  LATE
+}
+
+enum ContractType {
+  PRESTATION
+  COLLABORATION
+  PARTNERSHIP
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
