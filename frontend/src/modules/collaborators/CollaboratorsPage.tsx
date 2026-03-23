@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Edit2, ShieldAlert, Trash2, Check, X } from 'lucide-react';
+import { Edit2, ShieldAlert, Trash2, Check, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type User = {
   id: string;
@@ -21,11 +22,22 @@ type Collaborator = {
   user: User;
 };
 
+type PaginatedCollaborators = {
+  data: Collaborator[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 export function CollaboratorsPage() {
   const { role } = useAuth();
   const { showToast } = useToast();
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const queryClient = useQueryClient();
+
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   // Add form
   const [name, setName] = useState('');
@@ -41,23 +53,25 @@ export function CollaboratorsPage() {
   const [editSocial, setEditSocial] = useState('');
   const [editPhone, setEditPhone] = useState('');
 
-  const load = async () => {
-    try {
-      const data = await api.get<Collaborator[]>('/collaborators');
-      setCollaborators(data);
-    } catch {
-      // ignore
-    }
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['collaborators', page, debouncedSearch],
+    queryFn: () => api.get<PaginatedCollaborators>(`/collaborators?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const collaboratorsList = data?.data || [];
+
+  const reloadData = () => {
+    queryClient.invalidateQueries({ queryKey: ['collaborators'] });
   };
-
-  useEffect(() => { void load(); }, []);
-
-  const filteredCollaborators = collaborators.filter(c =>
-    (c.user?.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.user?.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.expertise || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.phone || '').toLowerCase().includes(search.toLowerCase())
-  );
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +80,7 @@ export function CollaboratorsPage() {
       await api.post<Collaborator>('/collaborators', { name, email, expertise, socialHandle, phone });
       showToast('Collaborateur ajouté !', 'success');
       setName(''); setEmail(''); setExpertise(''); setSocialHandle(''); setPhone('');
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de l\'ajout du collaborateur.', 'error');
     }
@@ -93,7 +107,7 @@ export function CollaboratorsPage() {
       });
       showToast('Données mises à jour !', 'success');
       setEditingId(null);
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de la mise à jour.', 'error');
     }
@@ -102,8 +116,9 @@ export function CollaboratorsPage() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Supprimer ce collaborateur ?')) return;
     try {
+      await api.delete(`/collaborators/${id}`);
       showToast('Collaborateur supprimé.', 'success');
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de la suppression.', 'error');
     }
@@ -121,7 +136,7 @@ export function CollaboratorsPage() {
           <h2>Liste des collaborateurs</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <ExportButtons 
-              data={filteredCollaborators.map(c => ({
+              data={collaboratorsList.map(c => ({
                 Nom: c.user.name || '—',
                 Email: c.user.email,
                 Rôle: c.user.role,
@@ -154,7 +169,19 @@ export function CollaboratorsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredCollaborators.map(c => (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  </td>
+                </tr>
+              ) : collaboratorsList.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
+                    Aucun collaborateur trouvé.
+                  </td>
+                </tr>
+              ) : collaboratorsList.map(c => (
                 <div key={c.id} style={{ display: 'contents' }}>
                   <tr>
                     <td>{c.user.name || '—'}</td>
@@ -193,7 +220,6 @@ export function CollaboratorsPage() {
                       </td>
                     )}
                   </tr>
-                  {/* Inline edit row */}
                   {editingId === c.id && (
                     <tr key={`edit-${c.id}`}>
                       <td colSpan={7} style={{ padding: '0' }}>
@@ -238,15 +264,35 @@ export function CollaboratorsPage() {
                   )}
                 </div>
               ))}
-              {collaborators.length === 0 && (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
-                    Aucun collaborateur enregistré.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+
+          {data && data.totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {data.totalCount} collaborateurs
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  className="ghost" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                <button 
+                  className="ghost" 
+                  disabled={page >= data.totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

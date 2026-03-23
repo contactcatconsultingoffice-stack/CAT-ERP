@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Edit2, Trash2, Check, X } from 'lucide-react';
+import { Edit2, Trash2, Check, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Partner = {
   id: string;
@@ -13,11 +14,22 @@ type Partner = {
   phone?: string | null;
 };
 
+type PaginatedPartners = {
+  data: Partner[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 export function PartnersPage() {
   const { role } = useAuth();
   const { showToast } = useToast();
-  const [partners, setPartners] = useState<Partner[]>([]);
+  const queryClient = useQueryClient();
+  
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   // Add form
   const [name, setName] = useState('');
@@ -25,30 +37,34 @@ export function PartnersPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
-  // Inline edit state: which row is being edited
+  // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editContact, setEditContact] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
 
-  const load = async () => {
-    try {
-      const data = await api.get<Partner[]>('/partners');
-      setPartners(data);
-    } catch {
-      // ignore
-    }
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['partners', page, debouncedSearch],
+    queryFn: () => api.get<PaginatedPartners>(`/partners?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const partnersList = data?.data || [];
+
+  const reloadData = () => {
+    queryClient.invalidateQueries({ queryKey: ['partners'] });
   };
-
-  useEffect(() => { void load(); }, []);
-
-  const filteredPartners = partners.filter(p =>
-    (p.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.contact || '').toLowerCase().includes(search.toLowerCase()) ||
-    (p.phone || '').toLowerCase().includes(search.toLowerCase())
-  );
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +73,7 @@ export function PartnersPage() {
       await api.post<Partner>('/partners', { name, contact, email, phone });
       showToast('Partenaire ajouté !', 'success');
       setName(''); setContact(''); setEmail(''); setPhone('');
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de l\'ajout du partenaire.', 'error');
     }
@@ -78,7 +94,7 @@ export function PartnersPage() {
       await api.put(`/partners/${id}`, { name: editName, contact: editContact, email: editEmail, phone: editPhone });
       showToast('Partenaire mis à jour !', 'success');
       setEditingId(null);
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de la mise à jour.', 'error');
     }
@@ -87,8 +103,9 @@ export function PartnersPage() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Supprimer ce partenaire ?')) return;
     try {
+      await api.delete(`/partners/${id}`);
       showToast('Partenaire supprimé.', 'success');
-      void load();
+      reloadData();
     } catch {
       showToast('Erreur lors de la suppression.', 'error');
     }
@@ -106,7 +123,7 @@ export function PartnersPage() {
           <h2>Liste</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <ExportButtons 
-              data={filteredPartners.map(p => ({ 
+              data={partnersList.map(p => ({ 
                 ID: p.id, 
                 Entreprise: p.name, 
                 Interlocuteur: p.contact || '', 
@@ -115,13 +132,14 @@ export function PartnersPage() {
               }))}
               filename="partenaires"
             />
-            <input
-              type="text"
-              placeholder="Rechercher un partenaire..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ padding: '0.5rem 0.75rem', borderRadius: '0.75rem', width: '260px', maxWidth: '100%' }}
-            />
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Rechercher un partenaire..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
           </div>
         </div>
         <div className="table-responsive">
@@ -136,8 +154,20 @@ export function PartnersPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredPartners.map(p => (
-                <div key={p.id} style={{ display: 'contents' }}>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  </td>
+                </tr>
+              ) : partnersList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
+                    Aucun partenaire trouvé.
+                  </td>
+                </tr>
+              ) : partnersList.map(p => (
+                <React.Fragment key={p.id}>
                   <tr>
                     <td>{p.name}</td>
                     <td>{p.contact || '—'}</td>
@@ -168,7 +198,6 @@ export function PartnersPage() {
                       </td>
                     )}
                   </tr>
-                  {/* Inline edit row */}
                   {editingId === p.id && (
                     <tr key={`edit-${p.id}`}>
                       <td colSpan={5} style={{ padding: '0' }}>
@@ -211,17 +240,37 @@ export function PartnersPage() {
                       </td>
                     </tr>
                   )}
-                </div>
+                </React.Fragment>
               ))}
-              {filteredPartners.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
-                    Aucun partenaire enregistré.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+          
+          {data && data.totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {data.totalCount} partenaires
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  className="ghost" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                <button 
+                  className="ghost" 
+                  disabled={page >= data.totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

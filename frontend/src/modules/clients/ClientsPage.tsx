@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Edit2, Trash2, Check, X } from 'lucide-react';
+import { Edit2, Trash2, Check, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type Client = {
   id: string;
@@ -13,11 +14,24 @@ type Client = {
   phone?: string | null;
 };
 
+type PaginatedClients = {
+  data: Client[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 export function ClientsPage() {
   const { role } = useAuth();
   const { showToast } = useToast();
-  const [clients, setClients] = useState<Client[]>([]);
+  const queryClient = useQueryClient();
+  
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  // Form states for Add
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
@@ -30,25 +44,27 @@ export function ClientsPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
 
-  const load = async () => {
-    try {
-      const data = await api.get<Client[]>('/clients');
-      setClients(data);
-    } catch {
-      // ignore for now if backend/db not ready
-    }
-  };
-
+  // Debounce search
   useEffect(() => {
-    void load();
-  }, []);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  const filteredClients = clients.filter(c => 
-    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.contact || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.phone || '').toLowerCase().includes(search.toLowerCase())
-  );
+  // Reset page to 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['clients', page, debouncedSearch],
+    queryFn: () => api.get<PaginatedClients>(`/clients?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const clientsList = data?.data || [];
+
+  const reloadData = () => {
+    queryClient.invalidateQueries({ queryKey: ['clients'] });
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +76,7 @@ export function ClientsPage() {
       setContact('');
       setEmail('');
       setPhone('');
-      void load();
+      reloadData();
     } catch (err) {
       showToast('Erreur lors de l’ajout du client.', 'error');
     }
@@ -86,7 +102,7 @@ export function ClientsPage() {
       });
       showToast('Client mis à jour !', 'success');
       setEditingId(null);
-      void load();
+      reloadData();
     } catch (err) {
       showToast('Erreur lors de la mise à jour.', 'error');
     }
@@ -95,8 +111,9 @@ export function ClientsPage() {
   const handleDelete = async (id: string) => {
     if (!window.confirm("Voulez-vous vraiment supprimer ce client ?")) return;
     try {
+      await api.delete(`/clients/${id}`);
       showToast('Client supprimé.', 'success');
-      void load();
+      reloadData();
     } catch (err) {
       showToast('Erreur lors de la suppression.', 'error');
     }
@@ -114,7 +131,7 @@ export function ClientsPage() {
           <h2>Liste</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <ExportButtons 
-              data={filteredClients.map(c => ({ 
+              data={clientsList.map(c => ({ 
                 ID: c.id, 
                 Entreprise: c.name, 
                 Interlocuteur: c.contact || '', 
@@ -129,7 +146,6 @@ export function ClientsPage() {
                 placeholder="Rechercher un client..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd', width: '300px', maxWidth: '100%' }}
               />
             </div>
           </div>
@@ -146,7 +162,19 @@ export function ClientsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map(c => (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  </td>
+                </tr>
+              ) : clientsList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    Aucun client trouvé.
+                  </td>
+                </tr>
+              ) : clientsList.map(c => (
                 <React.Fragment key={c.id}>
                   <tr>
                     <td>{c.name}</td>
@@ -218,6 +246,33 @@ export function ClientsPage() {
               ))}
             </tbody>
           </table>
+          
+          {data && data.totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {data.totalCount} clients
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  className="ghost" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                <button 
+                  className="ghost" 
+                  disabled={page >= data.totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

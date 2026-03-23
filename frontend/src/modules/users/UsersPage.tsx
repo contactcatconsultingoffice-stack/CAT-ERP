@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Trash2, UserPlus, Shield, User as UserIcon } from 'lucide-react';
+import { Trash2, UserPlus, Shield, User as UserIcon, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type User = {
   id: string;
@@ -15,6 +16,13 @@ type User = {
   collaborator?: {
     expertise: string | null;
   };
+};
+
+type PaginatedUsers = {
+  data: User[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
 };
 
 const MODULE_OPTIONS = [
@@ -31,39 +39,47 @@ const MODULE_OPTIONS = [
 export function UsersPage() {
   const { role: authRole, isSuperAdmin } = useAuth();
   const { showToast } = useToast();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState<{ id: string, email: string } | null>(null);
   const [showPermissionsModal, setShowPermissionsModal] = useState<User | null>(null);
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [newPasswordForUser, setNewPasswordForUser] = useState('');
+  
   const [filter, setFilter] = useState<'ALL' | 'ADMIN' | 'COLLABORATOR'>('ALL');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, filter]);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['users', page, debouncedSearch, filter],
+    queryFn: () => api.get<PaginatedUsers>(`/users?page=${page}&limit=${limit}&role=${filter}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const usersList = data?.data || [];
+
+  const reloadUsers = () => {
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+  };
   
   // New User Form
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [newRole, setNewRole] = useState<'ADMIN' | 'COLLABORATOR'>('COLLABORATOR');
-
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      const data = await api.get<User[]>('/users');
-      setUsers(data);
-    } catch (err: any) {
-      console.error('Failed to load users:', err);
-      setError(`Impossible de charger les utilisateurs: ${err.message || ''}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadUsers();
-  }, []);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +91,7 @@ export function UsersPage() {
       setPassword('');
       setNewRole('COLLABORATOR');
       showToast('Utilisateur créé !', 'success');
-      void loadUsers();
+      reloadUsers();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erreur lors de la création.', 'error');
     }
@@ -90,7 +106,7 @@ export function UsersPage() {
     try {
       await api.delete(`/users/${id}`);
       showToast('Utilisateur supprimé.', 'success');
-      void loadUsers();
+      reloadUsers();
     } catch (err) {
       showToast('Erreur lors de la suppression.', 'error');
     }
@@ -115,7 +131,7 @@ export function UsersPage() {
       await api.put(`/users/${showPermissionsModal.id}/permissions`, { permissions: selectedPermissions });
       showToast('Permissions mises à jour !', 'success');
       setShowPermissionsModal(null);
-      void loadUsers();
+      reloadUsers();
     } catch (err) {
       showToast('Erreur lors de la mise à jour des droits.', 'error');
     }
@@ -126,14 +142,6 @@ export function UsersPage() {
       prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
     );
   };
-
-  const filteredUsers = users.filter(u => {
-    const matchesFilter = filter === 'ALL' || u.role === filter;
-    const matchesSearch = 
-      (u.name && u.name.toLowerCase().includes(search.toLowerCase())) ||
-      u.email.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
 
   return (
     <div className="page">
@@ -285,10 +293,8 @@ export function UsersPage() {
           )}
         </div>
 
-        {loading ? (
-          <p>Chargement des membres...</p>
-        ) : error ? (
-          <p style={{ color: '#f87171' }}>{error}</p>
+        {error ? (
+          <p style={{ color: '#f87171' }}>Une erreur est survenue lors du chargement des utilisateurs.</p>
         ) : (
           <div className="table-responsive">
             <table className="lines-table">
@@ -301,7 +307,19 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((u) => (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                    </td>
+                  </tr>
+                ) : usersList.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                      Aucun membre trouvé dans cette catégorie.
+                    </td>
+                  </tr>
+                ) : usersList.map((u) => (
                   <tr key={u.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -364,15 +382,35 @@ export function UsersPage() {
                     </td>
                   </tr>
                 ))}
-                {filteredUsers.length === 0 && (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                      Aucun membre trouvé dans cette catégorie.
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
+            
+            {data && data.totalPages > 1 && (
+              <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Total: {data.totalCount} utilisateurs
+                </span>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button 
+                    className="ghost" 
+                    disabled={page === 1} 
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    style={{ padding: '0.3rem' }}
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                  <button 
+                    className="ghost" 
+                    disabled={page >= data.totalPages} 
+                    onClick={() => setPage(p => p + 1)}
+                    style={{ padding: '0.3rem' }}
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>

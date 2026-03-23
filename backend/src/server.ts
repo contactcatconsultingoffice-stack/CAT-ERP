@@ -8,6 +8,8 @@ import { prisma } from './prisma';
 import { requireAdmin, requireAuth, requireSuperAdmin, signToken, requirePermission } from './auth';
 import { logAction } from './utils/audit';
 
+import { validateRequest, ClientSchema, ProjectSchema, CollaboratorSchema, UserSchema, PartnerSchema } from './utils/validation';
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -137,12 +139,40 @@ app.post('/api/reset-password', async (req, res) => {
 });
 
 // --- Clients ---
-app.get('/api/clients', requireAuth, requirePermission('clients'), async (_req, res) => {
-  const clients = await prisma.client.findMany({ orderBy: { name: 'asc' } });
-  res.json(clients);
+app.get('/api/clients', requireAuth, requirePermission('clients'), async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const skip = (page - 1) * limit;
+
+  // Prisma where clause for global search
+  const where: any = search ? {
+    OR: [
+      { name: { contains: search, mode: 'insensitive' } },
+      { contact: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } }
+    ]
+  } : {};
+
+  const [data, totalCount] = await Promise.all([
+    prisma.client.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit
+    }),
+    prisma.client.count({ where })
+  ]);
+
+  res.json({
+    data,
+    totalCount,
+    currentPage: page,
+    totalPages: Math.ceil(totalCount / limit)
+  });
 });
 
-app.post('/api/clients', requireAuth, requirePermission('clients'), async (req, res) => {
+app.post('/api/clients', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), async (req, res) => {
   const { name, contact, email, phone } = req.body;
   const client = await prisma.client.create({
     data: { name, contact, email, phone }
@@ -151,7 +181,7 @@ app.post('/api/clients', requireAuth, requirePermission('clients'), async (req, 
   res.status(201).json(client);
 });
 
-app.put('/api/clients/:id', requireAuth, requirePermission('clients'), async (req, res) => {
+app.put('/api/clients/:id', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), async (req, res) => {
   const { id } = req.params;
   const { name, contact, email, phone } = req.body;
   const client = await prisma.client.update({
@@ -178,7 +208,7 @@ app.get('/api/projects', requireAuth, requirePermission('projects'), async (_req
   res.json(projects);
 });
 
-app.post('/api/projects', requireAuth, requirePermission('projects'), async (req, res) => {
+app.post('/api/projects', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), async (req, res) => {
   const { name, type, status, priority, clientId, partnerId, description } = req.body;
   
   const year = new Date().getFullYear();
@@ -193,7 +223,7 @@ app.post('/api/projects', requireAuth, requirePermission('projects'), async (req
   res.status(201).json(project);
 });
 
-app.put('/api/projects/:id', requireAuth, requirePermission('projects'), async (req, res) => {
+app.put('/api/projects/:id', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), async (req, res) => {
   const { id } = req.params;
   const { name, type, status, priority, clientId, partnerId, description } = req.body;
   const project = await prisma.project.update({
@@ -212,12 +242,36 @@ app.delete('/api/projects/:id', requireAuth, requirePermission('projects'), asyn
 });
 
 // --- Collaborators ---
-app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), async (_req, res) => {
-  const collaborators = await prisma.collaborator.findMany({ include: { user: true } });
-  res.json(collaborators);
+app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const skip = (page - 1) * limit;
+
+  const where: any = search ? {
+    OR: [
+      { expertise: { contains: search, mode: 'insensitive' } },
+      { phone: { contains: search, mode: 'insensitive' } },
+      { socialHandle: { contains: search, mode: 'insensitive' } },
+      { user: { name: { contains: search, mode: 'insensitive' } } },
+      { user: { email: { contains: search, mode: 'insensitive' } } }
+    ]
+  } : {};
+
+  const [data, totalCount] = await Promise.all([
+    prisma.collaborator.findMany({
+      where,
+      include: { user: true },
+      skip,
+      take: limit
+    }),
+    prisma.collaborator.count({ where })
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
 });
 
-app.post('/api/collaborators', requireAuth, requireAdmin, async (req, res) => {
+app.post('/api/collaborators', requireAuth, requireAdmin, validateRequest(CollaboratorSchema), async (req, res) => {
   const { email, name, password, expertise, socialHandle, phone } = req.body;
   const passwordHash = await bcrypt.hash(password || 'cat-erp-2024', 10);
   const user = await prisma.user.create({
@@ -259,23 +313,45 @@ app.delete('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res)
 });
 
 // --- Users (Admin Management) ---
-app.get('/api/users', requireAuth, requireAdmin, async (_req, res) => {
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isSuperAdmin: true,
-      createdAt: true,
-      permissions: true
-    }
-  });
-  res.json(users);
+app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' && req.query.search.trim() !== '' ? req.query.search : undefined;
+  const roleFilter = typeof req.query.role === 'string' && req.query.role !== 'ALL' ? req.query.role : undefined;
+  const skip = (page - 1) * limit;
+
+  const where: any = {};
+  if (roleFilter) where.role = roleFilter;
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } }
+    ];
+  }
+
+  const [data, totalCount] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isSuperAdmin: true,
+        createdAt: true,
+        permissions: true
+      },
+      skip,
+      take: limit
+    }),
+    prisma.user.count({ where })
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
 });
 
-app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
+app.post('/api/users', requireAuth, requireAdmin, validateRequest(UserSchema), async (req, res) => {
   const { email, name, password, role } = req.body;
   if (!email || !password || !role) {
     return res.status(400).json({ error: 'Email, mot de passe et rôle requis.' });
@@ -383,12 +459,35 @@ app.delete('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res)
 });
 
 // --- Partners ---
-app.get('/api/partners', requireAuth, requirePermission('partners'), async (_req, res) => {
-  const partners = await prisma.partner.findMany({ orderBy: { name: 'asc' } });
-  res.json(partners);
+app.get('/api/partners', requireAuth, requirePermission('partners'), async (req, res) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const skip = (page - 1) * limit;
+
+  const where: any = search ? {
+    OR: [
+      { name: { contains: search, mode: 'insensitive' } },
+      { contact: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { phone: { contains: search, mode: 'insensitive' } }
+    ]
+  } : {};
+
+  const [data, totalCount] = await Promise.all([
+    prisma.partner.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit
+    }),
+    prisma.partner.count({ where })
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
 });
 
-app.post('/api/partners', requireAuth, requirePermission('partners'), async (req, res) => {
+app.post('/api/partners', requireAuth, requirePermission('partners'), validateRequest(PartnerSchema), async (req, res) => {
   const { name, contact, email, phone } = req.body;
   const partner = await prisma.partner.create({
     data: { name, contact, email, phone }
