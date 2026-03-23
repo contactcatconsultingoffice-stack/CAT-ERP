@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Activity, Clock, User, Tag, Info } from 'lucide-react';
+import { Activity, Clock, User, Tag, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { TableSkeleton } from '../../components/Skeleton';
 
 type AuditLog = {
   id: string;
@@ -18,19 +19,33 @@ type AuditLog = {
   };
 };
 
+type PaginatedLogs = {
+  data: AuditLog[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 export function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 100;
   const { showToast } = useToast();
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [page]);
 
   const fetchLogs = async () => {
+    setLoading(true);
     try {
-      const data = await api.get<AuditLog[]>('/admin/logs');
-      setLogs(data);
+      const res = await api.get<PaginatedLogs>(`/admin/logs?page=${page}&limit=${limit}`);
+      setLogs(res.data || []);
+      setTotalPages(res.totalPages || 1);
+      setTotalCount(res.totalCount || 0);
     } catch (err) {
       showToast("Erreur lors de la récupération des logs", "error");
     } finally {
@@ -48,8 +63,6 @@ export function AuditLogsPage() {
       default: return '#94a3b8';
     }
   };
-
-  if (loading) return <div className="loading">Chargement des logs...</div>;
 
   return (
     <div className="page">
@@ -74,11 +87,17 @@ export function AuditLogsPage() {
                 <th>Action</th>
                 <th>Entité</th>
                 <th>Détails</th>
-                <th>Date & Heure</th>
+                <th>Date &amp; Heure</th>
               </tr>
             </thead>
             <tbody>
-              {logs.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: 0 }}>
+                    <TableSkeleton rows={10} cols={5} />
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
                     Aucune activité enregistrée pour le moment.
@@ -136,6 +155,23 @@ export function AuditLogsPage() {
               )}
             </tbody>
           </table>
+
+          {totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {totalCount} entrées
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button className="ghost" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} style={{ padding: '0.3rem' }}>
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {totalPages}</span>
+                <button className="ghost" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ padding: '0.3rem' }}>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
