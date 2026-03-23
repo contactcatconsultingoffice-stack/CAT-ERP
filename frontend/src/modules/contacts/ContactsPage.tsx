@@ -143,28 +143,26 @@ export function ContactsPage() {
 
   return (
     <div className="page">
-      <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
-          <h1>Contacts / Pipeline</h1>
-          <p>Kanban de suivi des prospects et leads commerciaux.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div className="search-box">
-            <input 
-              type="text" 
-              placeholder="Nom, email, tel..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ padding: '0.6rem', width: '220px', borderRadius: '0.75rem' }}
-            />
-          </div>
-          {role === 'ADMIN' && (
-            <button className="btn-primary" onClick={() => setShowAddModal(!showAddModal)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
-              <Plus size={18} /> {showAddModal ? 'Fermer' : 'Nouveau Contact'}
-            </button>
-          )}
-        </div>
+      <header className="page-header">
+        <h1>Contacts / Pipeline</h1>
+        <p>Kanban de suivi des prospects et leads commerciaux.</p>
       </header>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="search-box">
+          <input 
+            type="text" 
+            placeholder="Nom, email, tel..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        {role === 'ADMIN' && (
+          <button className="btn-primary" onClick={() => setShowAddModal(!showAddModal)}>
+            <Plus size={18} /> {showAddModal ? 'Fermer' : 'Nouveau Contact'}
+          </button>
+        )}
+      </div>
 
       {showAddModal && (
         <section className="card glass-card" style={{ marginBottom: '2rem' }}>
@@ -202,7 +200,7 @@ export function ContactsPage() {
         </section>
       )}
 
-      <div className="kanban-board" style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+      <div className="kanban-board">
         {columns.map(statusKey => {
           const colProspects = filtered.filter(p => p.status === statusKey);
           const visibleProspects = colProspects.slice(0, 3);
@@ -213,11 +211,10 @@ export function ContactsPage() {
               className="kanban-column"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, statusKey)}
-              style={{ minWidth: '280px', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', background: 'rgba(15, 23, 42, 0.4)', padding: '1rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.05)' }}
             >
-              <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between' }}>
-                {STATUS_LABELS[statusKey]}
-                <span style={{ background: 'rgba(255,255,255,0.1)', padding: '0.1rem 0.5rem', borderRadius: '1rem', color: '#fff' }}>{colProspects.length}</span>
+              <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className={"status status-" + statusKey.toLowerCase()}>{STATUS_LABELS[statusKey]}</span>
+                <span style={{ background: 'var(--bg-input)', padding: '0.1rem 0.6rem', borderRadius: '1rem', color: 'var(--text-primary)' }}>{colProspects.length}</span>
               </h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '300px' }}>
@@ -229,18 +226,18 @@ export function ContactsPage() {
                     onDragStart={(e) => handleDragStart(e, prospect.id)}
                     onDragEnd={handleDragEnd}
                     onClick={() => setSelectedProspect(prospect)}
-                    style={{ background: 'rgba(30, 41, 59, 0.8)', padding: '1rem', borderRadius: '0.75rem', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.05)', transition: 'all 0.2s ease', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+                    style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: '#f8fafc', fontWeight: 600 }}>{prospect.name}</h4>
+                      <h4 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text-primary)', fontWeight: 600 }}>{prospect.name}</h4>
                       {role === 'ADMIN' && (
-                        <button className="ghost" onClick={(e) => handleDelete(prospect.id, e)} style={{ padding: '0.2rem', margin: '-0.2rem', color: '#ef4444' }}>
+                        <button className="ghost delete-btn" onClick={(e) => handleDelete(prospect.id, e)} style={{ padding: '0.2rem', margin: '-0.2rem' }}>
                           <Trash2 size={14} />
                         </button>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem', color: '#94a3b8' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       {prospect.email && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <Mail size={12} /> {prospect.email}
@@ -251,27 +248,28 @@ export function ContactsPage() {
                           <Phone size={12} /> {prospect.contact}
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#475569' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)' }}>
                           <Phone size={12} /> Pas de tel
                         </div>
                       )}
                     </div>
 
                     {prospect.notes && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', background: 'rgba(0,0,0,0.1)', padding: '0.4rem', borderRadius: '0.4rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic', background: 'var(--bg-input)', padding: '0.4rem', borderRadius: 'var(--radius-sm)' }}>
                         {prospect.notes}
                       </div>
                     )}
 
-                    <div style={{ marginTop: 'auto', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ marginTop: 'auto', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
                       <select 
                         value={prospect.status}
                         onChange={(e) => { e.stopPropagation(); handleStatusChange(prospect.id, e.target.value as ProspectStatus); }}
                         onClick={e => e.stopPropagation()}
-                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.3rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0', borderRadius: '0.4rem', cursor: 'pointer', outline: 'none' }}
+                        className={"status status-" + prospect.status.toLowerCase()}
+                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.3rem', cursor: 'pointer', outline: 'none' }}
                       >
                         {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                          <option key={val} value={val} style={{ color: '#000' }}>{label}</option>
+                          <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
                         ))}
                       </select>
                     </div>
@@ -280,7 +278,7 @@ export function ContactsPage() {
                 
                 {hiddenProspects.length > 0 && (
                   <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: '0 0 0.25rem 0.5rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.25rem 0.5rem', fontWeight: 600, textTransform: 'uppercase' }}>
                       Autres contacts (+{hiddenProspects.length})
                     </p>
                     {hiddenProspects.map(p => (
@@ -291,31 +289,31 @@ export function ContactsPage() {
                         onDragEnd={handleDragEnd}
                         onClick={() => setSelectedProspect(p)}
                         style={{ 
-                          background: 'rgba(30, 41, 59, 0.4)', 
+                          background: 'var(--bg-card)', 
                           padding: '0.6rem 0.8rem', 
-                          borderRadius: '0.5rem', 
+                          borderRadius: 'var(--radius-sm)', 
                           cursor: 'pointer', 
-                          border: '1px solid rgba(255,255,255,0.03)',
+                          border: '1px solid var(--border-color)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           fontSize: '0.85rem',
-                          transition: 'background 0.2s'
+                          transition: 'border-color var(--transition-fast)'
                         }}
-                        onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(63, 66, 241, 0.1)')}
-                        onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)')}
+                        onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--border-color-active)')}
+                        onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
                       >
-                        <span style={{ color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                        <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
                           {p.name}
                         </span>
-                        <span style={{ color: '#64748b', fontSize: '0.7rem' }}>{p.email ? 'Email' : 'Info'}</span>
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{p.email ? 'Email' : 'Info'}</span>
                       </div>
                     ))}
                   </div>
                 )}
                 
                 {colProspects.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#475569', fontSize: '0.8rem', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '0.75rem', height: '100%' }}>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
                     Glissez un prospect ici
                   </div>
                 )}
@@ -327,12 +325,12 @@ export function ContactsPage() {
 
       {/* Prospect Details Modal */}
       {selectedProspect && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }} onClick={() => setSelectedProspect(null)}>
-          <div className="card glass-card" style={{ width: '100%', maxWidth: '500px', background: '#0f172a', padding: '2rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+        <div className="mobile-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }} onClick={() => setSelectedProspect(null)}>
+          <div className="card glass-card" style={{ width: '100%', maxWidth: '500px', padding: '2rem', maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.5rem', margin: 0, color: '#f8fafc' }}>{selectedProspect.name}</h2>
-                <div style={{ color: '#6366f1', fontSize: '0.85rem', marginTop: '0.2rem' }}>Prospect / Lead</div>
+                <h2 style={{ fontSize: '1.5rem', margin: 0 }}>{selectedProspect.name}</h2>
+                <div style={{ color: 'var(--text-accent)', fontSize: '0.85rem', marginTop: '0.2rem' }}>Prospect / Lead</div>
               </div>
               <button className="ghost" onClick={() => setSelectedProspect(null)} style={{ padding: '0.5rem' }}>
                 <X size={20} />
@@ -340,37 +338,37 @@ export function ContactsPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#e2e8f0' }}>
-                <Mail size={18} style={{ color: '#94a3b8' }} />
-                <div>{selectedProspect.email || <span style={{ color: '#475569', fontStyle: 'italic' }}>Non renseigné</span>}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
+                <Mail size={18} style={{ color: 'var(--text-secondary)' }} />
+                <div>{selectedProspect.email || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Non renseigné</span>}</div>
               </div>
               
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#e2e8f0' }}>
-                <Phone size={18} style={{ color: '#94a3b8' }} />
-                <div>{selectedProspect.contact || <span style={{ color: '#475569', fontStyle: 'italic' }}>Pas de numéro</span>}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
+                <Phone size={18} style={{ color: 'var(--text-secondary)' }} />
+                <div>{selectedProspect.contact || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pas de numéro</span>}</div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#e2e8f0' }}>
-                <Calendar size={18} style={{ color: '#94a3b8' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-primary)' }}>
+                <Calendar size={18} style={{ color: 'var(--text-secondary)' }} />
                 <div>Ajouté le {new Date(selectedProspect.createdAt).toLocaleDateString('fr-FR')}</div>
               </div>
             </div>
 
             <div style={{ marginBottom: '1rem' }}>
-              <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes / Commentaires</p>
-              <div style={{ padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.75rem', color: '#e2e8f0', fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                {selectedProspect.notes || <span style={{ fontStyle: 'italic', color: '#64748b' }}>Aucune note.</span>}
+              <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes / Commentaires</p>
+              <div style={{ padding: '1rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                {selectedProspect.notes || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Aucune note.</span>}
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
               <select 
                 value={selectedProspect.status}
                 onChange={(e) => handleStatusChange(selectedProspect.id, e.target.value as ProspectStatus)}
-                style={{ width: '100%', padding: '0.6rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.2)', color: '#fff', borderRadius: '0.5rem' }}
+                style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 'var(--radius-sm)' }}
               >
                 {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                  <option key={val} value={val} style={{ color: '#000' }}>{label}</option>
+                  <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
                 ))}
               </select>
             </div>
