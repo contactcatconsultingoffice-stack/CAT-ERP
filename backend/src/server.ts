@@ -10,8 +10,19 @@ import { logAction } from './utils/audit';
 
 import { validateRequest, ClientSchema, ProjectSchema, CollaboratorSchema, UserSchema, PartnerSchema } from './utils/validation';
 
+import { securityHeaders, apiRateLimiter, authRateLimiter, asyncHandler } from './middleware/security';
+import { errorHandler } from './middleware/errorHandler';
+
 const app = express();
-app.use(cors());
+
+// Security Headers & Global API Rate Limiter
+app.use(securityHeaders);
+app.use('/api/', apiRateLimiter);
+
+// CORS configuration supporting comma-separated origins
+app.use(cors({
+  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : '*'
+}));
 app.use(express.json());
 
 // Transporter for emails
@@ -23,17 +34,17 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-app.get('/api/health', async (_req, res) => {
+app.get('/api/health', asyncHandler(async (_req: express.Request, res: express.Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.json({ status: 'ok', db: 'connected' });
   } catch {
     res.json({ status: 'ok', db: 'disconnected' });
   }
-});
+}));
 
 // --- Authentication ---
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authRateLimiter, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { email, password } = req.body as { email: string; password: string };
   if (!email || !password) {
     return res.status(400).json({ error: 'Email et mot de passe requis.' });
@@ -69,9 +80,9 @@ app.post('/api/login', async (req, res) => {
       permissions
     } 
   });
-});
+}));
 
-app.post('/api/forgot-password', async (req, res) => {
+app.post('/api/forgot-password', authRateLimiter, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email requis.' });
 
@@ -112,9 +123,9 @@ app.post('/api/forgot-password', async (req, res) => {
     console.error('SMTP Error:', err);
     res.status(500).json({ error: "Erreur lors de l'envoi de l'email." });
   }
-});
+}));
 
-app.post('/api/reset-password', async (req, res) => {
+app.post('/api/reset-password', authRateLimiter, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { email, token, newPassword } = req.body;
   if (!email || !token || !newPassword) {
     return res.status(400).json({ error: 'Données manquantes.' });
@@ -125,7 +136,7 @@ app.post('/api/reset-password', async (req, res) => {
     return res.status(400).json({ error: 'Lien invalide ou expiré.' });
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({
     where: { email },
     data: {
@@ -136,16 +147,15 @@ app.post('/api/reset-password', async (req, res) => {
   });
 
   res.json({ message: 'Mot de passe mis à jour avec succès.' });
-});
+}));
 
 // --- Clients ---
-app.get('/api/clients', requireAuth, requirePermission('clients'), async (req, res) => {
+app.get('/api/clients', requireAuth, requirePermission('clients'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
   const skip = (page - 1) * limit;
 
-  // Prisma where clause for global search
   const where: any = search ? {
     OR: [
       { name: { contains: search, mode: 'insensitive' } },
@@ -170,18 +180,18 @@ app.get('/api/clients', requireAuth, requirePermission('clients'), async (req, r
     currentPage: page,
     totalPages: Math.ceil(totalCount / limit)
   });
-});
+}));
 
-app.post('/api/clients', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), async (req, res) => {
+app.post('/api/clients', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, contact, email, phone } = req.body;
   const client = await prisma.client.create({
     data: { name, contact, email, phone }
   });
   await logAction(req.user!.sub, 'CREATE', 'CLIENT', client.id, `Création du client ${client.name}`);
   res.status(201).json(client);
-});
+}));
 
-app.put('/api/clients/:id', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), async (req, res) => {
+app.put('/api/clients/:id', requireAuth, requirePermission('clients'), validateRequest(ClientSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { name, contact, email, phone } = req.body;
   const client = await prisma.client.update({
@@ -190,25 +200,35 @@ app.put('/api/clients/:id', requireAuth, requirePermission('clients'), validateR
   });
   await logAction(req.user!.sub, 'UPDATE', 'CLIENT', client.id, `Mise à jour du client ${client.name}`);
   res.json(client);
-});
+}));
 
-app.delete('/api/clients/:id', requireAuth, requirePermission('clients'), async (req, res) => {
+app.delete('/api/clients/:id', requireAuth, requirePermission('clients'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const client = await prisma.client.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'CLIENT', id, `Suppression du client ${client.name}`);
   res.status(204).send();
-});
+}));
 
 // --- Projects ---
-app.get('/api/projects', requireAuth, requirePermission('projects'), async (_req, res) => {
-  const projects = await prisma.project.findMany({
-    include: { client: true, partner: true },
-    orderBy: { createdAt: 'desc' }
-  });
-  res.json(projects);
-});
+app.get('/api/projects', requireAuth, requirePermission('projects'), asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
 
-app.post('/api/projects', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), async (req, res) => {
+  const [data, totalCount] = await Promise.all([
+    prisma.project.findMany({
+      include: { client: { select: { id: true, name: true, email: true } }, partner: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.project.count()
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
+
+app.post('/api/projects', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, type, status, priority, clientId, partnerId, description } = req.body;
   
   const year = new Date().getFullYear();
@@ -221,9 +241,9 @@ app.post('/api/projects', requireAuth, requirePermission('projects'), validateRe
   });
   await logAction(req.user!.sub, 'CREATE', 'PROJECT', project.id, `Création du projet ${project.name} (${reference})`);
   res.status(201).json(project);
-});
+}));
 
-app.put('/api/projects/:id', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), async (req, res) => {
+app.put('/api/projects/:id', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { name, type, status, priority, clientId, partnerId, description } = req.body;
   const project = await prisma.project.update({
@@ -232,17 +252,17 @@ app.put('/api/projects/:id', requireAuth, requirePermission('projects'), validat
   });
   await logAction(req.user!.sub, 'UPDATE', 'PROJECT', project.id, `Mise à jour du projet ${project.name}`);
   res.json(project);
-});
+}));
 
-app.delete('/api/projects/:id', requireAuth, requirePermission('projects'), async (req, res) => {
+app.delete('/api/projects/:id', requireAuth, requirePermission('projects'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const project = await prisma.project.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'PROJECT', id, `Suppression du projet ${project.name}`);
   res.status(204).send();
-});
+}));
 
 // --- Collaborators ---
-app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), async (req, res) => {
+app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
@@ -261,7 +281,7 @@ app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), a
   const [data, totalCount] = await Promise.all([
     prisma.collaborator.findMany({
       where,
-      include: { user: true },
+      include: { user: { select: { id: true, name: true, email: true, role: true } } },
       skip,
       take: limit
     }),
@@ -269,11 +289,11 @@ app.get('/api/collaborators', requireAuth, requirePermission('collaborators'), a
   ]);
 
   res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
-});
+}));
 
-app.post('/api/collaborators', requireAuth, requireAdmin, validateRequest(CollaboratorSchema), async (req, res) => {
+app.post('/api/collaborators', requireAuth, requireAdmin, validateRequest(CollaboratorSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { email, name, password, expertise, socialHandle, phone } = req.body;
-  const passwordHash = await bcrypt.hash(password || 'cat-erp-2024', 10);
+  const passwordHash = await bcrypt.hash(password || 'cat-erp-2024', 12);
   const user = await prisma.user.create({
     data: {
       email, name, passwordHash,
@@ -284,9 +304,9 @@ app.post('/api/collaborators', requireAuth, requireAdmin, validateRequest(Collab
   });
   await logAction(req.user!.sub, 'CREATE', 'COLLABORATOR', user.id, `Création du collaborateur ${name}`);
   res.status(201).json(user.collaborator);
-});
+}));
 
-app.put('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res) => {
+app.put('/api/collaborators/:id', requireAuth, requireAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { name, email, expertise, socialHandle, phone } = req.body;
   const collab = await prisma.collaborator.update({
@@ -299,9 +319,9 @@ app.put('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res) =>
   });
   await logAction(req.user!.sub, 'UPDATE', 'COLLABORATOR', id, `Mise à jour du collaborateur ${name}`);
   res.json(collab);
-});
+}));
 
-app.delete('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/collaborators/:id', requireAuth, requireAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const collab = await prisma.collaborator.findUnique({ where: { id }, include: { user: true } });
   if (collab) {
@@ -310,10 +330,10 @@ app.delete('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res)
     await logAction(req.user!.sub, 'DELETE', 'COLLABORATOR', id, `Suppression du collaborateur ${collab.user.name}`);
   }
   res.status(204).send();
-});
+}));
 
 // --- Users (Admin Management) ---
-app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
+app.get('/api/users', requireAuth, requireAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
   const search = typeof req.query.search === 'string' && req.query.search.trim() !== '' ? req.query.search : undefined;
@@ -349,31 +369,29 @@ app.get('/api/users', requireAuth, requireAdmin, async (req, res) => {
   ]);
 
   res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
-});
+}));
 
-app.post('/api/users', requireAuth, requireAdmin, validateRequest(UserSchema), async (req, res) => {
+app.post('/api/users', requireAuth, requireAdmin, validateRequest(UserSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { email, name, password, role } = req.body;
   if (!email || !password || !role) {
     return res.status(400).json({ error: 'Email, mot de passe et rôle requis.' });
   }
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
     data: { email, name, passwordHash, role }
   });
   res.status(201).json(user);
-});
+}));
 
-app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/users/:id', requireAuth, requireAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const targetUser = await prisma.user.findUnique({ where: { id } });
   if (!targetUser) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
 
-  // Safety: only Super Admin can delete another Admin
   if (targetUser.role === 'ADMIN' && !req.user?.isSuperAdmin) {
     return res.status(403).json({ error: 'Seul le Super Administrateur peut supprimer un Admin.' });
   }
 
-  // Safety: don't delete yourself
   if (id === req.user?.sub) {
     return res.status(400).json({ error: 'Vous ne pouvez pas supprimer votre propre compte.' });
   }
@@ -381,15 +399,15 @@ app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
   await prisma.user.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'USER', id, `Suppression de l'utilisateur ${targetUser.email}`);
   res.status(204).send();
-});
+}));
 
 // --- Super Admin: Change any user password ---
-app.put('/api/users/:id/password', requireAuth, requireSuperAdmin, async (req, res) => {
+app.put('/api/users/:id/password', requireAuth, requireSuperAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { newPassword } = req.body;
   if (!newPassword) return res.status(400).json({ error: 'Nouveau mot de passe requis.' });
 
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, 12);
   const user = await prisma.user.update({
     where: { id },
     data: { passwordHash }
@@ -397,12 +415,12 @@ app.put('/api/users/:id/password', requireAuth, requireSuperAdmin, async (req, r
 
   await logAction(req.user!.sub, 'UPDATE_PASSWORD', 'USER', id, `Changement de mot de passe pour ${user.email}`);
   res.json({ message: 'Mot de passe mis à jour.' });
-});
+}));
 
 // --- Super Admin: Manage Collaborator Permissions ---
-app.put('/api/users/:id/permissions', requireAuth, requireSuperAdmin, async (req, res) => {
+app.put('/api/users/:id/permissions', requireAuth, requireSuperAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
-  const { permissions } = req.body; // e.g. ["clients", "projects"]
+  const { permissions } = req.body;
   if (!Array.isArray(permissions)) return res.status(400).json({ error: 'Permissions invalides.' });
 
   const user = await prisma.user.findUnique({ where: { id } });
@@ -417,49 +435,30 @@ app.put('/api/users/:id/permissions', requireAuth, requireSuperAdmin, async (req
 
   await logAction(req.user!.sub, 'UPDATE_PERMISSIONS', 'USER', id, `Droits mis à jour pour ${user.email} : ${permissions.join(', ')}`);
   res.json({ message: 'Permissions mises à jour.' });
-});
+}));
 
 // --- Super Admin: Activity Logs ---
-app.get('/api/admin/logs', requireAuth, requireSuperAdmin, async (_req, res) => {
-  const logs = await prisma.auditLog.findMany({
-    include: { user: { select: { name: true, email: true } } },
-    orderBy: { createdAt: 'desc' },
-    take: 500
-  });
-  res.json(logs);
-});
+app.get('/api/admin/logs', requireAuth, requireSuperAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(1000, Number(req.query.limit) || 100)); // larger max limits for logs
+  const skip = (page - 1) * limit;
 
+  const [data, totalCount] = await Promise.all([
+    prisma.auditLog.findMany({
+      include: { user: { select: { name: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.auditLog.count()
+  ]);
 
-app.put('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { name, email, expertise, socialHandle, phone } = req.body;
-  const collab = await prisma.collaborator.update({
-    where: { id },
-    data: { 
-      expertise, 
-      socialHandle,
-      phone,
-      user: {
-        update: { name, email }
-      }
-    },
-    include: { user: true }
-  });
-  res.json(collab);
-});
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
 
-app.delete('/api/collaborators/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const collab = await prisma.collaborator.findUnique({ where: { id } });
-  if (collab) {
-    await prisma.collaborator.delete({ where: { id } });
-    await prisma.user.delete({ where: { id: collab.userId } });
-  }
-  res.status(204).send();
-});
 
 // --- Partners ---
-app.get('/api/partners', requireAuth, requirePermission('partners'), async (req, res) => {
+app.get('/api/partners', requireAuth, requirePermission('partners'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);
   const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
@@ -485,18 +484,18 @@ app.get('/api/partners', requireAuth, requirePermission('partners'), async (req,
   ]);
 
   res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
-});
+}));
 
-app.post('/api/partners', requireAuth, requirePermission('partners'), validateRequest(PartnerSchema), async (req, res) => {
+app.post('/api/partners', requireAuth, requirePermission('partners'), validateRequest(PartnerSchema), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, contact, email, phone } = req.body;
   const partner = await prisma.partner.create({
     data: { name, contact, email, phone }
   });
   await logAction(req.user!.sub, 'CREATE', 'PARTNER', partner.id, `Création du partenaire ${partner.name}`);
   res.status(201).json(partner);
-});
+}));
 
-app.put('/api/partners/:id', requireAuth, requirePermission('partners'), async (req, res) => {
+app.put('/api/partners/:id', requireAuth, requirePermission('partners'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { name, contact, email, phone } = req.body;
   const partner = await prisma.partner.update({
@@ -505,31 +504,42 @@ app.put('/api/partners/:id', requireAuth, requirePermission('partners'), async (
   });
   await logAction(req.user!.sub, 'UPDATE', 'PARTNER', partner.id, `Mise à jour du partenaire ${partner.name}`);
   res.json(partner);
-});
+}));
 
-app.delete('/api/partners/:id', requireAuth, requirePermission('partners'), async (req, res) => {
+app.delete('/api/partners/:id', requireAuth, requirePermission('partners'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const partner = await prisma.partner.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'PARTNER', id, `Suppression du partenaire ${partner.name}`);
   res.status(204).send();
-});
+}));
 
 // --- Prospects (Contacts CRM) ---
-app.get('/api/prospects', requireAuth, requirePermission('contacts'), async (_req, res) => {
-  const prospects = await prisma.prospect.findMany({ orderBy: { createdAt: 'desc' } });
-  res.json(prospects);
-});
+app.get('/api/prospects', requireAuth, requirePermission('contacts'), asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
 
-app.post('/api/prospects', requireAuth, requirePermission('contacts'), async (req, res) => {
+  const [data, totalCount] = await Promise.all([
+    prisma.prospect.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.prospect.count()
+  ]);
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
+
+app.post('/api/prospects', requireAuth, requirePermission('contacts'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { name, contact, email, status, notes } = req.body;
   const prospect = await prisma.prospect.create({
     data: { name, contact, email, status, notes }
   });
   await logAction(req.user!.sub, 'CREATE', 'CONTACT', prospect.id, `Création du contact ${prospect.name}`);
   res.status(201).json(prospect);
-});
+}));
 
-app.put('/api/prospects/:id', requireAuth, requirePermission('contacts'), async (req, res) => {
+app.put('/api/prospects/:id', requireAuth, requirePermission('contacts'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { name, contact, email, status, notes } = req.body;
   const prospect = await prisma.prospect.update({
@@ -538,25 +548,45 @@ app.put('/api/prospects/:id', requireAuth, requirePermission('contacts'), async 
   });
   await logAction(req.user!.sub, 'UPDATE', 'CONTACT', prospect.id, `Mise à jour du contact ${prospect.name}`);
   res.json(prospect);
-});
+}));
 
-app.delete('/api/prospects/:id', requireAuth, requirePermission('contacts'), async (req, res) => {
+app.delete('/api/prospects/:id', requireAuth, requirePermission('contacts'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const prospect = await prisma.prospect.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'CONTACT', id, `Suppression du contact ${prospect.name}`);
   res.status(204).send();
-});
+}));
 
 // --- Financial records (quotes / invoices) ---
-app.get('/api/financial', requireAuth, requirePermission('financial'), async (_req, res) => {
-  const records = await prisma.financialRecord.findMany({
-    include: { project: { include: { client: true } } },
-    orderBy: { issuedAt: 'desc' }
-  });
-  res.json(records);
-});
+app.get('/api/financial', requireAuth, requirePermission('financial'), asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const skip = (page - 1) * limit;
 
-app.post('/api/financial', requireAuth, requirePermission('financial'), async (req, res) => {
+  const where: any = search ? {
+    OR: [
+      { externalRef: { contains: search, mode: 'insensitive' } },
+      { project: { name: { contains: search, mode: 'insensitive' } } },
+      { project: { client: { name: { contains: search, mode: 'insensitive' } } } }
+    ]
+  } : {};
+
+  const [data, totalCount] = await Promise.all([
+    prisma.financialRecord.findMany({
+      where,
+      include: { project: { include: { client: { select: { name: true, email: true } } } } },
+      orderBy: { issuedAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.financialRecord.count({ where })
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
+
+app.post('/api/financial', requireAuth, requirePermission('financial'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const {
     kind, amountHT, amountTTC, currency, status, dueDate, projectId, externalRef, lines, paymentTerms
   } = req.body;
@@ -581,9 +611,9 @@ app.post('/api/financial', requireAuth, requirePermission('financial'), async (r
 
   await logAction(req.user!.sub, 'CREATE', 'FINANCIAL', record.id, `Création ${kind} ${ref}`);
   res.status(201).json(record);
-});
+}));
 
-app.put('/api/financial/:id', requireAuth, requirePermission('financial'), async (req, res) => {
+app.put('/api/financial/:id', requireAuth, requirePermission('financial'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms } = req.body;
   const record = await prisma.financialRecord.update({
@@ -593,24 +623,44 @@ app.put('/api/financial/:id', requireAuth, requirePermission('financial'), async
   });
   await logAction(req.user!.sub, 'UPDATE', 'FINANCIAL', record.id, `Mise à jour document ${record.externalRef}`);
   res.json(record);
-});
+}));
 
-app.delete('/api/financial/:id', requireAuth, requirePermission('financial'), async (req, res) => {
+app.delete('/api/financial/:id', requireAuth, requirePermission('financial'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { id } = req.params;
   const record = await prisma.financialRecord.delete({ where: { id } });
   await logAction(req.user!.sub, 'DELETE', 'FINANCIAL', id, `Suppression document ${record.externalRef}`);
   res.status(204).send();
-});
+}));
 
 // --- Contracts ---
-app.get('/api/contracts', requireAuth, requirePermission('contracts'), async (_req, res) => {
-  const contracts = await prisma.contract.findMany({
-    orderBy: { createdAt: 'desc' }
-  });
-  res.json(contracts);
-});
+app.get('/api/contracts', requireAuth, requirePermission('contracts'), asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const skip = (page - 1) * limit;
 
-app.post('/api/contracts', requireAuth, requirePermission('contracts'), async (req, res) => {
+  const where: any = search ? {
+    OR: [
+      { title: { contains: search, mode: 'insensitive' } },
+      { type: { contains: search, mode: 'insensitive' } },
+      { location: { contains: search, mode: 'insensitive' } }
+    ]
+  } : {};
+
+  const [data, totalCount] = await Promise.all([
+    prisma.contract.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.contract.count({ where })
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
+
+app.post('/api/contracts', requireAuth, requirePermission('contracts'), asyncHandler(async (req: express.Request, res: express.Response) => {
   const { type, title, rawText, projectId, financialId, signedAt, location } =
     req.body;
 
@@ -627,21 +677,31 @@ app.post('/api/contracts', requireAuth, requirePermission('contracts'), async (r
   });
 
   res.status(201).json(contract);
-});
+}));
 
 // --- Missions (timesheets) ---
-app.get('/api/missions', requireAuth, requirePermission('missions'), async (_req, res) => {
-  const missions = await prisma.mission.findMany({
-    include: { 
-      project: true, 
-      collaborator: { include: { user: true } } 
-    },
-    orderBy: { performedAt: 'desc' }
-  });
-  res.json(missions);
-});
+app.get('/api/missions', requireAuth, requirePermission('missions'), asyncHandler(async (req: express.Request, res: express.Response) => {
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
 
-app.post('/api/missions', requireAuth, requireAdmin, async (req, res) => {
+  const [data, totalCount] = await Promise.all([
+    prisma.mission.findMany({
+      include: { 
+        project: { select: { id: true, name: true } }, 
+        collaborator: { include: { user: { select: { name: true, email: true } } } } 
+      },
+      orderBy: { performedAt: 'desc' },
+      skip,
+      take: limit
+    }),
+    prisma.mission.count()
+  ]);
+
+  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
+}));
+
+app.post('/api/missions', requireAuth, requireAdmin, asyncHandler(async (req: express.Request, res: express.Response) => {
   const { projectId, collaboratorId, description, hours, performedAt } =
     req.body;
 
@@ -656,11 +716,18 @@ app.post('/api/missions', requireAuth, requireAdmin, async (req, res) => {
   });
 
   res.status(201).json(mission);
+}));
+
+// Catch-all route for unknown API endpoints
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Route de l\'API introuvable.' });
 });
+
+// GLOBAL ERROR HANDLER (MUST BE LAST APP.USE)
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Backend API listening on http://localhost:${PORT}`);
 });
-

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Trash2, Plus, Receipt, FileText, Download, X } from 'lucide-react';
+import { Trash2, Plus, Receipt, FileText, Download, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { InvoicePdf } from '../invoices/InvoicePdf';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type PaymentStatus = 'READY_TO_SEND' | 'SENT' | 'PENDING' | 'PAID' | 'LATE';
 
@@ -30,6 +31,13 @@ type FinancialRecord = {
   paymentTerms?: string;
 };
 
+type PaginatedFinancialRecords = {
+  data: FinancialRecord[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 type ProjectRef = { id: string; name: string };
 
 const STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -43,13 +51,15 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
 export function FinancialPage() {
   const { role } = useAuth();
   const { showToast } = useToast();
-  const [records, setRecords] = useState<FinancialRecord[]>([]);
-  const [projects, setProjects] = useState<ProjectRef[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState('');
-  const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
+  const queryClient = useQueryClient();
 
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
   const [previewRecord, setPreviewRecord] = useState<FinancialRecord | null>(null);
 
   // New Record Form State
@@ -64,35 +74,45 @@ export function FinancialPage() {
     { id: 1, description: '', quantity: 1, unitPrice: 0 }
   ]);
 
-  const load = async () => {
-    try {
-      setLoading(true);
-      const [rec, proj] = await Promise.all([
-        api.get<FinancialRecord[]>('/financial'),
-        api.get<ProjectRef[]>('/projects')
-      ]);
-      setRecords(rec);
-      setProjects(proj);
-      
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const { data: exchangeRates } = useQuery({
+    queryKey: ['exchangeRates'],
+    queryFn: async () => {
       try {
         const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
         const data = await res.json();
-        if (data && data.rates) {
-          setRates(data.rates);
-        }
+        return data.rates || { USD: 1 };
       } catch (err) {
-        console.warn("Exchange rates fetch failed", err);
+        return { USD: 1 };
       }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    staleTime: 3600000 // Cache for 1 hour
+  });
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (exchangeRates) setRates(exchangeRates);
+  }, [exchangeRates]);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['financial', page, debouncedSearch],
+    queryFn: () => api.get<PaginatedFinancialRecords>(`/financial?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => api.get<ProjectRef[]>('/projects')
+  });
+
+  const recordsList = data?.data || [];
+  const projects = projectsData || [];
 
   const updateLine = (id: number, patch: Partial<InvoiceLine>) => {
     setLines(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
@@ -132,7 +152,7 @@ export function FinancialPage() {
       setInitStatus('READY_TO_SEND');
       setLines([{ id: 1, description: '', quantity: 1, unitPrice: 0 }]);
       showToast('Document créé !', 'success');
-      void load();
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
     } catch (err) {
       showToast("Erreur lors de la création.", "error");
     }
@@ -142,7 +162,7 @@ export function FinancialPage() {
     try {
       await api.put(`/financial/${id}`, { status: newStatus });
       showToast('Statut mis à jour !', 'success');
-      void load();
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
     } catch (err) {
       showToast("Erreur lors du changement de statut.", "error");
     }
@@ -153,34 +173,26 @@ export function FinancialPage() {
     try {
       await api.delete(`/financial/${id}`);
       showToast('Document supprimé.', 'success');
-      void load();
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
     } catch {
       showToast("Erreur lors de la suppression.", "error");
     }
   };
-
-  const filteredRecords = records.filter(r => {
-    const term = search.toLowerCase();
-    return (
-      (r.externalRef || '').toLowerCase().includes(term) ||
-      (r.project?.name || '').toLowerCase().includes(term)
-    );
-  });
 
   const toUSD = (amount: number, curr: string) => {
     if (curr === 'USD' || !rates[curr]) return amount;
     return amount / rates[curr];
   };
 
-  const totalPaid = filteredRecords
+  // We only compute totals on the current page to avoid massive calculations. 
+  // For global totals, a dedicated dashboard endpoint is recommended.
+  const totalPaid = recordsList
     .filter(r => r.kind === 'INVOICE' && r.status === 'PAID')
     .reduce((sum, r) => sum + toUSD(Number(r.amountTTC || 0), r.currency), 0);
 
-  const totalSent = filteredRecords
+  const totalSent = recordsList
     .filter(r => r.kind === 'INVOICE' && r.status === 'SENT')
     .reduce((sum, r) => sum + toUSD(Number(r.amountTTC || 0), r.currency), 0);
-
-  if (loading) return <div className="page">Chargement...</div>;
 
   return (
     <div className="page">
@@ -213,7 +225,7 @@ export function FinancialPage() {
             <Receipt size={28} />
           </div>
           <div>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>Revenus encaissés</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>Revenus page courante</p>
             <h3 style={{ margin: '0.25rem 0 0', fontSize: '1.75rem', fontWeight: 700 }}>
               {totalPaid.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
             </h3>
@@ -225,7 +237,7 @@ export function FinancialPage() {
             <FileText size={28} />
           </div>
           <div>
-            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>Factures envoyées (SENT)</p>
+            <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', fontWeight: 500 }}>Envoyé page courante (SENT)</p>
             <h3 style={{ margin: '0.25rem 0 0', fontSize: '1.75rem', fontWeight: 700 }}>
               {totalSent.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}
             </h3>
@@ -383,14 +395,20 @@ export function FinancialPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  </td>
+                </tr>
+              ) : recordsList.length === 0 ? (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
                     Aucun document trouvé.
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map(r => (
+                recordsList.map(r => (
                   <tr key={r.id}>
                     <td style={{ fontWeight: 600 }}>{r.externalRef || 'N/A'}</td>
                     <td>{r.project?.name}</td>
@@ -449,6 +467,33 @@ export function FinancialPage() {
               )}
             </tbody>
           </table>
+          
+          {data && data.totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {data.totalCount} documents
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  className="ghost" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                <button 
+                  className="ghost" 
+                  disabled={page >= data.totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

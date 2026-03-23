@@ -7,9 +7,10 @@ import {
   PRESTATION_CONTRACT_TEXT
 } from './contractTemplates';
 import { ContractPdf } from './ContractPdf';
-import { Trash2, Save } from 'lucide-react';
+import { Trash2, Save, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../../components/Toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 type ContractType = 'PRESTATION' | 'COLLABORATION' | 'PARTNERSHIP';
 
@@ -22,11 +23,22 @@ type Contract = {
   createdAt: string;
 };
 
+type PaginatedContracts = {
+  data: Contract[];
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+};
+
 export function ContractsPage() {
   const { role } = useAuth();
   const { showToast } = useToast();
-  const [contracts, setContracts] = useState<Contract[]>([]);
+  const queryClient = useQueryClient();
+
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 20;
   
   const [type, setType] = useState<ContractType>('PRESTATION');
   const [client, setClient] = useState('');
@@ -36,19 +48,22 @@ export function ContractsPage() {
   const [endDate, setEndDate] = useState('');
   const [amount, setAmount] = useState('');
   const [place, setPlace] = useState('');
-  
-  const loadContracts = async () => {
-    try {
-      const data = await api.get<Contract[]>('/contracts');
-      setContracts(data);
-    } catch {
-      // ignore
-    }
-  };
 
   useEffect(() => {
-    void loadContracts();
-  }, []);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+  
+  const { data, isLoading } = useQuery({
+    queryKey: ['contracts', page, debouncedSearch],
+    queryFn: () => api.get<PaginatedContracts>(`/contracts?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+  });
+
+  const contractsList = data?.data || [];
 
   const getTitle = (t: ContractType) => {
     switch (t) {
@@ -75,16 +90,11 @@ export function ContractsPage() {
         location: place
       });
       showToast('Contrat sauvegardé !', 'success');
-      void loadContracts();
+      queryClient.invalidateQueries({ queryKey: ['contracts'] });
     } catch {
       showToast('Erreur lors de la sauvegarde.', 'error');
     }
   };
-
-  const filteredContracts = contracts.filter(c => 
-    c.title.toLowerCase().includes(search.toLowerCase()) ||
-    c.type.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="page">
@@ -117,23 +127,57 @@ export function ContractsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredContracts.map(c => (
-                <tr key={c.id}>
-                  <td>{new Date(c.createdAt).toLocaleDateString()}</td>
-                  <td>{c.title}</td>
-                  <td>{c.type}</td>
-                  <td>{c.location || '-'}</td>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  </td>
                 </tr>
-              ))}
-              {contracts.length === 0 && (
+              ) : contractsList.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ textAlign: 'center', color: '#94a3b8', padding: '1rem' }}>
                     Aucun contrat enregistré.
                   </td>
                 </tr>
+              ) : (
+                contractsList.map(c => (
+                  <tr key={c.id}>
+                    <td>{new Date(c.createdAt).toLocaleDateString()}</td>
+                    <td>{c.title}</td>
+                    <td>{c.type}</td>
+                    <td>{c.location || '-'}</td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
+
+          {data && data.totalPages > 1 && (
+            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Total: {data.totalCount} contrats
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <button 
+                  className="ghost" 
+                  disabled={page === 1} 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
+                <button 
+                  className="ghost" 
+                  disabled={page >= data.totalPages} 
+                  onClick={() => setPage(p => p + 1)}
+                  style={{ padding: '0.3rem' }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -214,7 +258,7 @@ export function ContractsPage() {
         
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
           {role === 'ADMIN' && (
-            <button type="button" onClick={handleSaveContract} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button type="button" onClick={handleSaveContract} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Save size={18} /> Sauvegarder dans la base
             </button>
           )}
@@ -243,7 +287,7 @@ export function ContractsPage() {
           >
             {/* @ts-ignore */}
             {({ loading }) => (
-              <button type="button" className="ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button type="button" className="ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.1)', color: 'white' }}>
                 {loading ? 'Génération...' : 'Télécharger le PDF'}
               </button>
             )}
@@ -257,4 +301,3 @@ export function ContractsPage() {
     </div>
   );
 }
-

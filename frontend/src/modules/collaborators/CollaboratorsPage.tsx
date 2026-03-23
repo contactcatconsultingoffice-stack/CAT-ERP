@@ -5,6 +5,7 @@ import { Edit2, ShieldAlert, Trash2, Check, X, ChevronLeft, ChevronRight, Loader
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { TableSkeleton } from '../../components/Skeleton';
 
 type User = {
   id: string;
@@ -171,8 +172,8 @@ export function CollaboratorsPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                    <Loader2 className="spinner" size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <TableSkeleton rows={8} cols={7} />
                   </td>
                 </tr>
               ) : collaboratorsList.length === 0 ? (
