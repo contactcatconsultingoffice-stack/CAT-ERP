@@ -36,14 +36,19 @@ export function MissionsPage() {
 
   const load = async () => {
     try {
-      const [miss, proj, fallbackCollabs] = await Promise.all([
-        api.get<Mission[]>('/missions'),
-        api.get<{id: string, name: string}[]>('/projects'),
-        api.get<any[]>('/collaborators') // Changed from /simple
+      const [missRes, projRes, collRes] = await Promise.all([
+        api.get<{ data: Mission[] }>('/missions'),
+        api.get<{ data: {id: string, name: string}[] }>('/projects'),
+        api.get<{ data: any[] }>('/collaborators')
       ]);
+
+      const miss = Array.isArray(missRes) ? missRes : (missRes.data ?? []);
+      const proj = Array.isArray(projRes) ? projRes : (projRes.data ?? []);
+      const fallbackCollabs = Array.isArray(collRes) ? collRes : (collRes.data ?? []);
+
       setMissions(miss);
       setProjects(proj);
-      // Map collaborators to include a 'name' field from the associated user
+      
       if (fallbackCollabs) {
         setCollaborators(fallbackCollabs.map(c => ({
           id: c.id,

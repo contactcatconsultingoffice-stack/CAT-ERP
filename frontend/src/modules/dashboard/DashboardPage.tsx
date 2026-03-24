@@ -4,6 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useQuery } from '@tanstack/react-query';
 import { KpiSkeleton } from '../../components/Skeleton';
 import { AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 type FinancialRecord = {
   id: string;
@@ -129,6 +131,21 @@ export function DashboardPage() {
     return acc;
   }, {} as Record<string, number>);
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
     <div className="page">
       <header className="page-header">
@@ -143,33 +160,38 @@ export function DashboardPage() {
         </div>
       )}
 
-      <section className="card">
+      <motion.section 
+        className="card"
+        variants={containerVariants}
+        initial="hidden"
+        animate="show"
+      >
         {isLoading ? (
           <KpiSkeleton count={4} />
         ) : (
           <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-            <div className="kpi" style={{ borderLeftColor: STATUS_COLORS.PLANNING }}>
+            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.PLANNING }}>
               <h3>Planifiés</h3>
-              <p>{countsByStatus.PLANNING || 0}</p>
-            </div>
-            <div className="kpi" style={{ borderLeftColor: STATUS_COLORS.IN_PROGRESS }}>
+              <p><AnimatedNumber value={countsByStatus.PLANNING || 0} /></p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.IN_PROGRESS }}>
               <h3>En cours</h3>
-              <p>{countsByStatus.IN_PROGRESS || 0}</p>
-            </div>
-            <div className="kpi" style={{ borderLeftColor: STATUS_COLORS.ON_HOLD }}>
+              <p><AnimatedNumber value={countsByStatus.IN_PROGRESS || 0} /></p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.ON_HOLD }}>
               <h3>En pause</h3>
-              <p>{countsByStatus.ON_HOLD || 0}</p>
-            </div>
-            <div className="kpi" style={{ borderLeftColor: STATUS_COLORS.COMPLETED }}>
+              <p><AnimatedNumber value={countsByStatus.ON_HOLD || 0} /></p>
+            </motion.div>
+            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.COMPLETED }}>
               <h3>Terminés</h3>
-              <p>{countsByStatus.COMPLETED || 0}</p>
-            </div>
+              <p><AnimatedNumber value={countsByStatus.COMPLETED || 0} /></p>
+            </motion.div>
           </div>
         )}
         
         {!isLoading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '2rem', marginTop: '2rem' }}>
-            <div className="card" style={{ padding: '1.5rem' }}>
+            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Revenus ($ USD) par Mois</h3>
               
               {revenueData.length === 0 ? (
@@ -189,30 +211,30 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                 </div>
               )}
-            </div>
+            </motion.div>
             
-            <div className="card" style={{ padding: '1.5rem' }}>
+            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Statistiques Globales</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Nombre de Projets</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{projects.length}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={projects.length} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Partenaires</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{partners.length}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={partners.length} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Collaborateurs</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{collaborators.length}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={collaborators.length} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Clients</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{clients.length}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={clients.length} /></span>
                 </div>
               </div>
-            </div>
-            <div className="card" style={{ padding: '1.5rem' }}>
+            </motion.div>
+            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Répartition par Statut</h3>
               
               {statusData.length === 0 ? (
@@ -242,10 +264,10 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                 </div>
               )}
-            </div>
+            </motion.div>
           </div>
         )}
-      </section>
+      </motion.section>
     </div>
   );
 }

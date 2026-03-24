@@ -43,8 +43,8 @@ export function ContactsPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const data = await api.get<Prospect[]>('/prospects');
-      setProspects(data);
+      const res = await api.get<{ data: Prospect[] }>('/prospects');
+      setProspects(Array.isArray(res) ? res : (res.data ?? []));
     } catch (err) {
       console.error(err);
     } finally {

@@ -78,13 +78,13 @@ export function ProjectsPage() {
     try {
       setLoading(true);
       const [proj, cls, parts] = await Promise.all([
-        api.get<Project[]>('/projects'),
-        api.get<ClientRef[]>('/clients'),
-        api.get<PartnerRef[]>('/partners')
+        api.get<{ data: Project[] }>('/projects'),
+        api.get<{ data: ClientRef[] }>('/clients'),
+        api.get<{ data: PartnerRef[] }>('/partners')
       ]);
-      setProjects(proj);
-      setClients(cls);
-      setPartners(parts);
+      setProjects(Array.isArray(proj) ? proj : (proj.data ?? []));
+      setClients(Array.isArray(cls) ? cls : (cls.data ?? []));
+      setPartners(Array.isArray(parts) ? parts : (parts.data ?? []));
     } catch (err) {
       console.error(err);
     } finally {

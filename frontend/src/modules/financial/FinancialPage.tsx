@@ -108,11 +108,11 @@ export function FinancialPage() {
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
-    queryFn: () => api.get<ProjectRef[]>('/projects')
+    queryFn: () => api.get<{ data: ProjectRef[] }>('/projects')
   });
 
   const recordsList = data?.data || [];
-  const projects = projectsData || [];
+  const projects = Array.isArray(projectsData) ? projectsData : (projectsData?.data ?? []);
 
   const updateLine = (id: number, patch: Partial<InvoiceLine>) => {
     setLines(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
