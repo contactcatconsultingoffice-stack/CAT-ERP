@@ -2,28 +2,17 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 export type ApiConfig = {
   baseUrl?: string;
-  getToken?: () => string | null;
 };
 
 const defaultConfig: ApiConfig = {
-  baseUrl: '/api',
-  getToken: () => {
-    // Always check localStorage as the primary source to avoid race conditions
-    const raw = localStorage.getItem('cat-erp-auth');
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed.token || null;
-    } catch {
-      return null;
-    }
-  }
+  baseUrl: '/api'
 };
 
 let config: ApiConfig = defaultConfig;
 
 export function logout() {
-  localStorage.removeItem('cat-erp-auth'); // New key
+  // We can't clear HttpOnly cookies from JS, but the backend /logout route does it.
+  // This local logout clears local state and redirects.
   window.location.href = '/login';
 }
 
@@ -32,31 +21,46 @@ async function request<T>(
   path: string,
   body?: unknown
 ): Promise<T> {
-  const currentConfig = config; // Use captured config
-  const token = currentConfig.getToken?.() ?? null;
-  const res = await fetch(`${currentConfig.baseUrl}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
+  const currentConfig = config; 
+  console.log(`[API] Sending ${method} to ${path}`);
+  try {
+    const res = await fetch(`${currentConfig.baseUrl}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // CRITICAL for HttpOnly cookies
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    console.log(`[API] Received status ${res.status} from ${path}`);
 
   if (res.status === 204) {
     return {} as T;
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
-      logout();
+    if (res.status === 401 && path !== '/auth/login') {
+      // Don't auto-redirect on /auth/me to avoid infinite loops during checkAuth
+      if (path !== '/auth/me') {
+        logout();
+      }
       throw new Error('Votre session a expiré. Veuillez vous reconnecter.');
     }
     const text = await res.text();
-    throw new Error(text || res.statusText);
+    try {
+      const data = JSON.parse(text);
+      throw new Error(data.error || res.statusText);
+    } catch {
+      throw new Error(text || res.statusText);
+    }
   }
 
-  return (await res.json()) as T;
+    return (await res.json()) as T;
+  } catch (err) {
+    console.error(`[API] Error on ${path}:`, err);
+    throw err;
+  }
 }
 
 export const api = {

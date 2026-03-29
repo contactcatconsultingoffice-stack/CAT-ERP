@@ -1,51 +1,61 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthContext, type AuthState, type Role } from './AuthContext';
-
-const STORAGE_KEY = 'cat-erp-auth';
+import { api } from '../api/client';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ 
-    token: null, 
+    id: null,
+    email: null,
+    name: null,
     role: null, 
     isSuperAdmin: false,
     permissions: [] 
   });
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AuthState;
-        setState(parsed);
-      } catch {
-        // ignore
+  const checkAuth = useCallback(async () => {
+    try {
+      const user = await api.get<AuthState>('/auth/me');
+      if (user) {
+        setState(user);
+      } else {
+        setState({ id: null, email: null, name: null, role: null, isSuperAdmin: false, permissions: [] });
       }
+    } catch {
+      setState({ id: null, email: null, name: null, role: null, isSuperAdmin: false, permissions: [] });
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const login = useCallback((token: string, role: Role, isSuperAdmin: boolean, permissions: string[]) => {
-    const next = { token, role, isSuperAdmin, permissions };
-    setState(next);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  const login = useCallback((userData: AuthState) => {
+    setState(userData);
   }, []);
 
-  const logout = useCallback(() => {
-    setState({ token: null, role: null, isSuperAdmin: false, permissions: [] });
-    window.localStorage.removeItem(STORAGE_KEY);
+  const logout = useCallback(async () => {
+    try {
+      await api.post('/auth/logout', {});
+    } catch {
+      // ignore
+    }
+    setState({ id: null, email: null, name: null, role: null, isSuperAdmin: false, permissions: [] });
+    window.location.href = '/login';
   }, []);
 
   return (
     <AuthContext.Provider
       value={{ 
-        token: state.token, 
-        role: state.role, 
-        isSuperAdmin: state.isSuperAdmin, 
-        permissions: state.permissions,
+        user: state,
+        loading,
         login, 
         logout 
       }}
     >
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 
 type Mission = {
@@ -19,7 +19,8 @@ type Mission = {
 };
 
 export function MissionsPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user?.role;
   const { showToast } = useToast();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [projects, setProjects] = useState<{id: string, name: string}[]>([]);
@@ -27,6 +28,7 @@ export function MissionsPage() {
   
   const [search, setSearch] = useState('');
   const [projectIdFilter, setProjectIdFilter] = useState('ALL');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [projectId, setProjectId] = useState('');
   const [collaboratorId, setCollaboratorId] = useState('');
@@ -79,6 +81,7 @@ export function MissionsPage() {
       showToast("Veuillez remplir tous les champs obligatoires.", "warning");
       return;
     }
+    setIsSubmitting(true);
     try {
       await api.post('/missions', {
         projectId,
@@ -93,6 +96,8 @@ export function MissionsPage() {
       void load();
     } catch (err) {
       showToast('Erreur lors de l’enregistrement de la mission.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -209,7 +214,10 @@ export function MissionsPage() {
               <input type="date" value={performedAt} onChange={e => setPerformedAt(e.target.value)} />
             </label>
             <div style={{ marginTop: '1rem' }}>
-              <button type="submit">Enregistrer la mission</button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                {isSubmitting ? 'Enregistrement...' : 'Enregistrer la mission'}
+              </button>
             </div>
           </form>
         </section>

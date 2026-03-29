@@ -20,8 +20,10 @@ model User {
   updatedAt         DateTime @updatedAt
   permissions       String[] @default([]) // e.g. ["clients", "projects"]
 
-  collaborator Collaborator?
-  auditLogs    AuditLog[]
+  collaborator    Collaborator?
+  auditLogs       AuditLog[]
+  comments        Comment[]
+  calendarEvents  CalendarEvent[]
 }
 
 model AuditLog {
@@ -75,6 +77,7 @@ model Project {
   reference   String?       @unique     // e.g. PRJ-2026-001
   name        String
   type        ProjectType
+  subType     String?
   status      ProjectStatus @default(PLANNING)
   priority    Priority      @default(MEDIUM)
   client      Client        @relation(fields: [clientId], references: [id])
@@ -150,10 +153,10 @@ enum UserRole {
 }
 
 enum ProjectType {
-  PORTFOLIO
-  BLOG
-  ECOMMERCE
-  APPLICATION
+  STRATEGIE
+  GESTION
+  DEVELOPPEMENT
+  TECH
 }
 
 enum ProjectStatus {
@@ -196,3 +199,31 @@ enum Priority {
   HIGH
 }
 
+model Comment {
+  id         String   @id @default(cuid())
+  content    String
+  entityType String   // "PROJECT" | "PROSPECT"
+  entityId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId   String
+  createdAt  DateTime @default(now())
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime?
+  type        EventType @default(EVENT)
+  isDone      Boolean   @default(false)
+  color       String    @default("#6366f1")
+  creator     User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId   String
+  createdAt   DateTime  @default(now())
+}
+
+enum EventType {
+  EVENT
+  TODO
+}

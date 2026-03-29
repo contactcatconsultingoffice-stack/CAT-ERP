@@ -23,7 +23,8 @@ type PaginatedPartners = {
 };
 
 export function PartnersPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user?.role;
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   
@@ -44,6 +45,8 @@ export function PartnersPage() {
   const [editContact, setEditContact] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [isAdding, setIsAdding] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // Debounce search
   useEffect(() => {
@@ -70,6 +73,7 @@ export function PartnersPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
+    setIsAdding(true);
     try {
       await api.post<Partner>('/partners', { name, contact, email, phone });
       showToast('Partenaire ajouté !', 'success');
@@ -77,6 +81,8 @@ export function PartnersPage() {
       reloadData();
     } catch {
       showToast('Erreur lors de l\'ajout du partenaire.', 'error');
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -91,6 +97,7 @@ export function PartnersPage() {
   const cancelEdit = () => setEditingId(null);
 
   const handleSaveEdit = async (id: string) => {
+    setIsUpdating(true);
     try {
       await api.put(`/partners/${id}`, { name: editName, contact: editContact, email: editEmail, phone: editPhone });
       showToast('Partenaire mis à jour !', 'success');
@@ -98,6 +105,8 @@ export function PartnersPage() {
       reloadData();
     } catch {
       showToast('Erreur lors de la mise à jour.', 'error');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -230,10 +239,11 @@ export function PartnersPage() {
                             <input value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.1rem' }}>
-                            <button type="button" className="btn-primary" onClick={() => handleSaveEdit(p.id)} style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <Check size={14} /> Sauvegarder
+                            <button type="button" className="btn-primary" onClick={() => handleSaveEdit(p.id)} disabled={isUpdating} style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} 
+                              {isUpdating ? 'Enregistrement...' : 'Sauvegarder'}
                             </button>
-                            <button type="button" className="ghost" onClick={cancelEdit} style={{ padding: '0.5rem', display: 'flex', alignItems: 'center' }}>
+                            <button type="button" className="ghost" onClick={cancelEdit} disabled={isUpdating} style={{ padding: '0.5rem', display: 'flex', alignItems: 'center' }}>
                               <X size={14} />
                             </button>
                           </div>
@@ -283,7 +293,12 @@ export function PartnersPage() {
             <label>Interlocuteur <input value={contact} onChange={e => setContact(e.target.value)} /></label>
             <label>Email <input value={email} type="email" onChange={e => setEmail(e.target.value)} /></label>
             <label>Téléphone <input value={phone} onChange={e => setPhone(e.target.value)} /></label>
-            <div><button type="submit" className="btn-primary">Enregistrer</button></div>
+            <div>
+              <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isAdding && <Loader2 size={16} className="animate-spin" />}
+                {isAdding ? 'Ajout...' : 'Enregistrer'}
+              </button>
+            </div>
           </form>
         </section>
       )}

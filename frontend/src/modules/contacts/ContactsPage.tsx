@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Plus, Trash2, Mail, User, Phone, X, Calendar } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Phone, X, Calendar, Loader2 } from 'lucide-react';
 import { useToast } from '../../components/Toast';
+import { CommentsPanel } from '../../components/CommentsPanel';
 
-type ProspectStatus = 'A_CONTACTER' | 'CONTACTE' | 'REPONDU' | 'EN_DISCUSSION' | 'CONFIRME';
+type ProspectStatus = 'A_CONTACTER' | 'CONTACTE' | 'EN_DISCUSSION' | 'CONFIRME';
 
 type Prospect = {
   id: string;
@@ -19,16 +20,17 @@ type Prospect = {
 const STATUS_LABELS: Record<ProspectStatus, string> = {
   A_CONTACTER: 'À contacter',
   CONTACTE: 'Contacté',
-  REPONDU: 'Répondu',
   EN_DISCUSSION: 'En discussion',
   CONFIRME: 'Confirmé'
 };
 
 export function ContactsPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user?.role;
   const { showToast } = useToast();
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
@@ -59,6 +61,7 @@ export function ContactsPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
+    setIsSubmitting(true);
     try {
       await api.post('/prospects', { name, contact: contact || null, email: email || null, status, notes: notes || null });
       showToast('Contact créé avec succès !', 'success');
@@ -71,6 +74,8 @@ export function ContactsPage() {
       void load();
     } catch (err) {
       showToast('Erreur lors de la création du contact.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -137,7 +142,7 @@ export function ContactsPage() {
     );
   });
 
-  const columns: ProspectStatus[] = ['A_CONTACTER', 'CONTACTE', 'REPONDU', 'EN_DISCUSSION', 'CONFIRME'];
+  const columns: ProspectStatus[] = ['A_CONTACTER', 'CONTACTE', 'EN_DISCUSSION', 'CONFIRME'];
 
   if (loading) return <div className="page">Chargement...</div>;
 
@@ -193,8 +198,11 @@ export function ContactsPage() {
               <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Précisez le besoin..." rows={2} style={{ width: '100%', padding: '0.6rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }} />
             </label>
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-              <button type="submit" className="btn-primary" style={{ width: 'fit-content' }}>Créer le contact</button>
-              <button type="button" className="ghost" onClick={() => setShowAddModal(false)}>Annuler</button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isSubmitting && <Loader2 size={16} className="animate-spin" />}
+                {isSubmitting ? 'Création...' : 'Créer le contact'}
+              </button>
+              <button type="button" className="ghost" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Annuler</button>
             </div>
           </form>
         </section>
@@ -372,6 +380,8 @@ export function ContactsPage() {
                 ))}
               </select>
             </div>
+
+            <CommentsPanel entityType="PROSPECT" entityId={selectedProspect.id} />
           </div>
         </div>
       )}

@@ -30,7 +30,8 @@ export const PartnerSchema = ClientSchema; // Partners share the same structure
 
 export const ProjectSchema = z.object({
   name: z.string().min(2, 'Le nom doit contenir au moins 2 caractères').max(150),
-  type: z.enum(['PORTFOLIO', 'BLOG', 'ECOMMERCE', 'APPLICATION']),
+  type: z.enum(['STRATEGIE', 'GESTION', 'DEVELOPPEMENT', 'TECH']),
+  subType: z.string().max(150).optional().nullable(),
   status: z.enum(['PLANNING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   clientId: z.string().cuid('Client ID invalide'),

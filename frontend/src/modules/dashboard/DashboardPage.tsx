@@ -42,55 +42,45 @@ export function DashboardPage() {
   useEffect(() => {
     const fetchRates = async () => {
       try {
-        const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-        const data = await res.json();
-        if (data && data.rates) {
-          setRates(data.rates);
+        const res = await api.get<{ rates: Record<string, number> }>('/rates');
+        if (res && res.rates) {
+          setRates(res.rates);
         }
       } catch (err) {
-        console.warn("Exchange rates fetch failed", err);
+        console.warn("Internal exchange rates fetch failed", err);
       }
     };
     fetchRates();
   }, []);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboardData'],
+    queryKey: ['dashboardSummary'],
     queryFn: async () => {
-      // Use Promise.allSettled so that if one API fails, we still render the rest
       const results = await Promise.allSettled([
-        api.get<any>('/financial?limit=1000'), // Or summary endpoint
-        api.get<any>('/missions?limit=1000'),
-        api.get<any>('/projects?limit=1000'),
-        api.get<any>('/clients?limit=1000'),
-        api.get<any>('/partners?limit=1000'),
-        api.get<any>('/collaborators?limit=1000')
+        api.get<any>('/dashboard/summary'),
+        api.get<any>('/financial?limit=1000&status=PAID&kind=INVOICE'), // Still need this for revenue chart
       ]);
 
-      const [finRes, misRes, projRes, cliRes, parRes, colRes] = results;
+      const [sumRes, finRes] = results;
 
       return {
+        summary: sumRes.status === 'fulfilled' ? sumRes.value : null,
         financial: finRes.status === 'fulfilled' ? finRes.value.data || finRes.value : [],
-        missions: misRes.status === 'fulfilled' ? misRes.value.data || misRes.value : [],
-        projects: projRes.status === 'fulfilled' ? projRes.value.data || projRes.value : [],
-        clients: cliRes.status === 'fulfilled' ? cliRes.value.data || cliRes.value : [],
-        partners: parRes.status === 'fulfilled' ? parRes.value.data || parRes.value : [],
-        collaborators: colRes.status === 'fulfilled' ? colRes.value.data || colRes.value : [],
         hasErrors: results.some(r => r.status === 'rejected')
       };
     },
-    staleTime: 120000 // Cache for 2 minutes
+    staleTime: 120000 
   });
 
   const {
+    summary,
     financial = [],
-    missions = [],
-    projects = [],
-    clients = [],
-    partners = [],
-    collaborators = [],
     hasErrors = false
   } = data || {};
+
+  const counts = summary?.counts || {};
+  const statusCounts = counts.status || {};
+  const countsByStatus = statusCounts; // For backward compatibility with the JSX below
 
   const toUSD = (amount: number, curr: string) => {
     if (curr === 'USD' || !rates[curr]) return amount;
@@ -112,24 +102,15 @@ export function DashboardPage() {
   };
 
   const processStatusData = () => {
-    const counts: Record<string, number> = { PLANNING: 0, IN_PROGRESS: 0, ON_HOLD: 0, COMPLETED: 0 };
-    projects.forEach((p: Project) => {
-      counts[p.status] = (counts[p.status] || 0) + 1;
-    });
-    return Object.entries(counts).map(([name, value]) => ({ 
+    return Object.entries(statusCounts).map(([name, value]) => ({ 
       name: STATUS_LABELS[name] || name, 
-      value,
+      value: value as number,
       color: STATUS_COLORS[name as keyof typeof STATUS_COLORS] 
     })).filter(d => d.value > 0);
   };
 
   const revenueData = processRevenueData();
   const statusData = processStatusData();
-  
-  const countsByStatus = projects.reduce((acc: any, p: Project) => {
-    acc[p.status] = (acc[p.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -218,24 +199,24 @@ export function DashboardPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Nombre de Projets</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={projects.length} /></span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.projects || 0} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Partenaires</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={partners.length} /></span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.partners || 0} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Collaborateurs</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={collaborators.length} /></span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.collaborators || 0} /></span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Clients</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={clients.length} /></span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.clients || 0} /></span>
                 </div>
               </div>
             </motion.div>
-            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Répartition par Statut</h3>
+            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem', gridColumn: '1 / -1', maxWidth: '600px', justifySelf: 'center', width: '100%' }}>
+              <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600, textAlign: 'center' }}>Répartition par Statut</h3>
               
               {statusData.length === 0 ? (
                 <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -254,7 +235,7 @@ export function DashboardPage() {
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        {statusData.map((entry, index) => (
+                        {statusData.map((entry: any, index: number) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>

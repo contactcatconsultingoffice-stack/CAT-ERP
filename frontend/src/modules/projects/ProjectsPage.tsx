@@ -13,8 +13,9 @@ import {
 } from 'lucide-react';
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
+import { CommentsPanel } from '../../components/CommentsPanel';
 type ProjectStatus = 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD';
-type ProjectType = 'PORTFOLIO' | 'BLOG' | 'ECOMMERCE' | 'APPLICATION';
+type ProjectType = 'STRATEGIE' | 'GESTION' | 'DEVELOPPEMENT' | 'TECH';
 type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 
 type Project = {
@@ -22,9 +23,11 @@ type Project = {
   reference: string | null;
   name: string;
   type: ProjectType;
+  subType: string | null;
   status: ProjectStatus;
   priority: Priority;
   clientId: string;
+  partnerId: string | null;
   description?: string | null;
   createdAt: string;
   client?: { name: string; contact?: string; email?: string };
@@ -41,6 +44,38 @@ const STATUS_LABELS: Record<ProjectStatus, string> = {
   ON_HOLD: 'En pause'
 };
 
+const TYPE_LABELS: Record<ProjectType, string> = {
+  STRATEGIE: 'Analyse Stratégique & Marché',
+  GESTION: 'Gestion & Pilotage de Projet',
+  DEVELOPPEMENT: 'Développement & Innovation',
+  TECH: 'Solutions Techniques & Digital'
+};
+
+const SUBTYPES: Record<ProjectType, string[]> = {
+  STRATEGIE: [
+    'Étude de Marché & Analyse Concurrentielle',
+    'Business Model & Business Plan',
+    'Audit de Performance & Diagnostic'
+  ],
+  GESTION: [
+    'Assistance à Maîtrise d\'Ouvrage (AMO)',
+    'Accompagnement au Changement',
+    'Mise en place de PMO'
+  ],
+  DEVELOPPEMENT: [
+    'Stratégie de Croissance (Go-to-market)',
+    'Innovation de Modèle Économique',
+    'Validation de Concept (MVP)'
+  ],
+  TECH: [
+    'Développement de Sites Web (Vitrine, E-commerce)',
+    'Applications Mobiles & Logicielles',
+    'Branding & Identité Visuelle (Logos)',
+    'Marketing Digital & SEO',
+    'Solutions IA & Automatisation'
+  ]
+};
+
 const PRIORITY_LABELS: Record<Priority, string> = {
   LOW: 'Basse',
   MEDIUM: 'Moyenne',
@@ -54,12 +89,14 @@ const PRIORITY_COLORS: Record<Priority, string> = {
 };
 
 export function ProjectsPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const role = user?.role;
   const { showToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<ClientRef[]>([]);
   const [partners, setPartners] = useState<PartnerRef[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   
   const [showAddModal, setShowAddModal] = useState(false);
@@ -67,12 +104,18 @@ export function ProjectsPage() {
 
   // Form State
   const [name, setName] = useState('');
-  const [type, setType] = useState<ProjectType>('PORTFOLIO');
+  const [type, setType] = useState<ProjectType>('STRATEGIE');
+  const [subType, setSubType] = useState('');
   const [status, setStatus] = useState<ProjectStatus>('PLANNING');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [clientId, setClientId] = useState('');
   const [partnerId, setPartnerId] = useState('');
   const [description, setDescription] = useState('');
+
+  // Update subType when type changes
+  useEffect(() => {
+    setSubType(SUBTYPES[type][0]);
+  }, [type]);
 
   const load = async () => {
     try {
@@ -99,8 +142,9 @@ export function ProjectsPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !clientId) return;
+    setIsSubmitting(true);
     try {
-      await api.post('/projects', { name, type, status, priority, clientId, partnerId: partnerId || null, description });
+      await api.post('/projects', { name, type, subType, status, priority, clientId, partnerId: partnerId || null, description });
       showToast('Projet créé avec succès !', 'success');
       setName('');
       setDescription('');
@@ -110,6 +154,8 @@ export function ProjectsPage() {
       void load();
     } catch (err) {
       showToast('Erreur lors de la création du projet.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -250,12 +296,19 @@ export function ProjectsPage() {
               </select>
             </label>
             <label>
-              Type *
-              <select value={type} onChange={e => setType(e.target.value as ProjectType)}>
-                <option value="PORTFOLIO">Portfolio</option>
-                <option value="BLOG">Blog</option>
-                <option value="ECOMMERCE">E-commerce</option>
-                <option value="APPLICATION">Application</option>
+              Domaine d'intervention *
+              <select value={type} onChange={e => setType(e.target.value as ProjectType)} required>
+                {Object.entries(TYPE_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Sous-type de prestation *
+              <select value={subType} onChange={e => setSubType(e.target.value)} required>
+                {SUBTYPES[type].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -279,8 +332,11 @@ export function ProjectsPage() {
               <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Objectifs, spécifications..." rows={3} />
             </label>
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-              <button type="submit" className="btn-primary" style={{ width: 'fit-content' }}>Générer le projet (Réf auto)</button>
-              <button type="button" className="ghost" onClick={() => setShowAddModal(false)}>Annuler</button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {isSubmitting && <Plus size={18} className="animate-spin" />}
+                {isSubmitting ? 'Création...' : 'Générer le projet (Réf auto)'}
+              </button>
+              <button type="button" className="ghost" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Annuler</button>
             </div>
           </form>
         </section>
@@ -399,10 +455,16 @@ export function ProjectsPage() {
                         onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--border-color-active)')}
                         onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
                       >
-                        <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>
-                          {project.name}
-                        </span>
-                        <span style={{ color: 'var(--text-accent)', fontSize: '0.7rem' }}>{project.reference}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                          <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {project.name}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{TYPE_LABELS[project.type]}</span>
+                            {project.subType && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>• {project.subType}</span>}
+                          </div>
+                        </div>
+                        <span style={{ color: 'var(--text-accent)', fontSize: '0.7rem', flexShrink: 0 }}>{project.reference}</span>
                       </div>
                     ))}
                   </div>
@@ -469,6 +531,8 @@ export function ProjectsPage() {
                 {selectedProject.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Aucune description fournie.</span>}
               </div>
             </div>
+
+            <CommentsPanel entityType="PROJECT" entityId={selectedProject.id} />
           </div>
         </div>
       )}

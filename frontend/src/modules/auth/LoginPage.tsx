@@ -19,13 +19,12 @@ export function LoginPage() {
     setError('');
     try {
       const res = await api.post<{ 
-        token: string, 
-        user: { id: string, role: Role, isSuperAdmin: boolean, permissions: string[] } 
-      }>('/login', {
+        user: { id: string, name: string, email: string, role: Role, isSuperAdmin: boolean, permissions: string[] } 
+      }>('/auth/login', {
         email,
         password
       });
-      login(res.token, res.user.role, res.user.isSuperAdmin, res.user.permissions);
+      login(res.user);
       navigate('/dashboard');
     } catch (err) {
       setError(

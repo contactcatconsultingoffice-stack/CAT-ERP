@@ -4,13 +4,18 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'admin@cat-consulting.com';
-  const password = 'Admin@CAT2024!';
-  const name = 'Super Admin';
+  const email = 'contact.catconsultingoffice@gmail.com';
+  const password = 'Admin@CAT2024!'; // Vous pourrez changer ce mot de passe
+  const name = 'Super Administrateur';
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     console.log(`⚠️  Super admin already exists: ${email}`);
+    // Optional: make sure it's isSuperAdmin
+    await prisma.user.update({
+      where: { email },
+      data: { isSuperAdmin: true, role: 'ADMIN' }
+    });
     return;
   }
 
@@ -21,6 +26,7 @@ async function main() {
       name,
       passwordHash,
       role: 'ADMIN',
+      isSuperAdmin: true,
     },
   });
 

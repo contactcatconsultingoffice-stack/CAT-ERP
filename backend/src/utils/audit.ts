@@ -1,6 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../prisma';
 
 export async function logAction(userId: string, action: string, entity: string, entityId?: string, details?: string) {
   try {

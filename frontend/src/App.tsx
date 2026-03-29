@@ -12,6 +12,7 @@ import { CollaboratorsPage } from './modules/collaborators/CollaboratorsPage';
 import { PartnersPage } from './modules/partners/PartnersPage';
 import { ContactsPage } from './modules/contacts/ContactsPage';
 import { UsersPage } from './modules/users/UsersPage';
+import { CalendarPage } from './modules/calendar/CalendarPage';
 import { ForgotPasswordPage } from './modules/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './modules/auth/ResetPasswordPage';
 import { AuditLogsPage } from './modules/admin/AuditLogsPage';
@@ -39,7 +40,8 @@ import {
   X as CloseIcon,
   ExternalLink,
   Sun,
-  Moon
+  Moon,
+  CalendarDays
 } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
 
@@ -60,7 +62,8 @@ function P({ children, req }: { children: JSX.Element, req?: string }) {
 }
 
 export function App() {
-  const { token, role, isSuperAdmin, permissions, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { role, isSuperAdmin, permissions } = user || { role: null, isSuperAdmin: false, permissions: [] };
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -150,7 +153,7 @@ export function App() {
 
   const isLoginPage = location.pathname === '/login' || location.pathname === '/forgot-password' || location.pathname === '/reset-password';
 
-  if (!token && isLoginPage) {
+  if (!user.id && isLoginPage) {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -161,7 +164,7 @@ export function App() {
     );
   }
 
-  if (!token) {
+  if (!user.id) {
     return <Navigate to="/login" replace />;
   }
 
@@ -171,21 +174,29 @@ export function App() {
   return (
     <div className={`app-shell ${isSidebarOpen ? '' : 'sidebar-closed'}`}>
       <header className="mobile-header">
-        {!isMobileMenuOpen && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <img src="/logo.png" alt="CAT ERP" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-            <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em', color: 'var(--text-primary)' }}>CAT ERP</span>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', alignItems: 'center' }}>
-          <button className="ghost" onClick={toggleTheme} style={{ padding: '0.5rem' }} title="Changer le thème">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-          </button>
-          <button className="ghost" onClick={toggleMobileMenu} style={{ padding: '0.5rem' }}>
-            {isMobileMenuOpen ? <CloseIcon size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-      </header>
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    opacity: isMobileMenuOpen ? 0 : 1,
+    pointerEvents: isMobileMenuOpen ? 'none' : 'auto',
+    transition: 'opacity 0.2s ease',
+    minWidth: 0,
+  }}>
+    <img src="/logo.png" alt="CAT ERP" style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
+    <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>CAT ERP</span>
+  </div>
+  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', alignItems: 'center', flexShrink: 0 }}>
+    {!isMobileMenuOpen && (
+      <button className="ghost" onClick={toggleTheme} style={{ padding: '0.5rem' }} title="Changer le thème">
+        {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+      </button>
+    )}
+    <button className="ghost" onClick={toggleMobileMenu} style={{ padding: '0.5rem' }}>
+      {isMobileMenuOpen ? <CloseIcon size={24} /> : <Menu size={24} />}
+    </button>
+  </div>
+</header>
 
       {isMobileMenuOpen && <div className="mobile-backdrop" onClick={closeMobileMenu} />}
 
@@ -223,9 +234,7 @@ export function App() {
           >
             {isSidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
-          <button className="ghost mobile-only-close" onClick={closeMobileMenu} style={{ padding: '0.5rem' }}>
-            <CloseIcon size={24} />
-          </button>
+          
         </div>
 
         {isSidebarOpen && (
@@ -306,15 +315,16 @@ export function App() {
         )}
 
         <nav onClick={closeMobileMenu}>
-          <NavLink to="/dashboard" className="nav-link"><LayoutDashboard size={20} /><span>Dashboard</span></NavLink>
+          <NavLink to="/dashboard" className="nav-link"><LayoutDashboard size={20} /><span>Tableau de Bord</span></NavLink>
           {(role === 'ADMIN' || permissions.includes('clients')) && <NavLink to="/clients" className="nav-link"><Users size={20} /><span>Clients</span></NavLink>}
-          {(role === 'ADMIN' || permissions.includes('projects')) && <NavLink to="/projects" className="nav-link"><FolderOpen size={20} /><span>Projects</span></NavLink>}
-          {(role === 'ADMIN' || permissions.includes('partners')) && <NavLink to="/partners" className="nav-link"><Handshake size={20} /><span>Partners</span></NavLink>}
-          {(role === 'ADMIN' || permissions.includes('collaborators')) && <NavLink to="/collaborators" className="nav-link"><Network size={20} /><span>Collaborators</span></NavLink>}
+          <NavLink to="/projects" className="nav-link"><FolderOpen size={20} /><span>Projets</span></NavLink>
+          <NavLink to="/calendar" className="nav-link"><CalendarDays size={20} /><span>Calendrier</span></NavLink>
+          {(role === 'ADMIN' || permissions.includes('partners')) && <NavLink to="/partners" className="nav-link"><Handshake size={20} /><span>Partenaires</span></NavLink>}
+          {(role === 'ADMIN' || permissions.includes('collaborators')) && <NavLink to="/collaborators" className="nav-link"><Network size={20} /><span>Collaborateurs</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('contacts')) && <NavLink to="/contacts" className="nav-link"><User size={20} /><span>Contacts</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/financial" className="nav-link"><PieChart size={20} /><span>Factures & Devis</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/invoices" className="nav-link"><FileText size={20} /><span>Générateur PDF</span></NavLink>}
-          {(role === 'ADMIN' || permissions.includes('contracts')) && <NavLink to="/contracts" className="nav-link"><Briefcase size={20} /><span>Contracts</span></NavLink>}
+          {(role === 'ADMIN' || permissions.includes('contracts')) && <NavLink to="/contracts" className="nav-link"><Briefcase size={20} /><span>Contrats</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('missions')) && <NavLink to="/missions" className="nav-link"><Clock size={20} /><span>Missions</span></NavLink>}
           {role === 'ADMIN' && <NavLink to="/users" className="nav-link"><Users size={20} /><span>Utilisateurs</span></NavLink>}
           {isSuperAdmin && <NavLink to="/admin/logs" className="nav-link"><Activity size={20} /><span>Journal d'Activité</span></NavLink>}
@@ -329,7 +339,7 @@ export function App() {
               </button>
             </div>
             <div className="sidebar-footer-text" style={{ marginBottom: '0.4rem', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>
-              {isSidebarOpen && <>Connecté en tant que <strong style={{color: 'var(--text-primary)'}}>{role}</strong></>}
+              {isSidebarOpen && <>Connecté en tant que <strong style={{color: 'var(--text-primary)'}}>{isSuperAdmin ? 'Super Admin' : role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</strong></>}
             </div>
             <button type="button" className="ghost btn-logout" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}>
               <LogOut size={16} /> <span className="logout-text">Déconnexion</span>
@@ -350,7 +360,8 @@ export function App() {
             <Route path="/" element={<P><DashboardPage /></P>} />
             <Route path="/dashboard" element={<P><DashboardPage /></P>} />
             <Route path="/clients" element={<P req="clients"><ClientsPage /></P>} />
-            <Route path="/projects" element={<P req="projects"><ProjectsPage /></P>} />
+            <Route path="/projects" element={<P><ProjectsPage /></P>} />
+            <Route path="/calendar" element={<P><CalendarPage /></P>} />
             <Route path="/partners" element={<P req="partners"><PartnersPage /></P>} />
             <Route path="/collaborators" element={<P req="collaborators"><CollaboratorsPage /></P>} />
             <Route path="/contacts" element={<P req="contacts"><ContactsPage /></P>} />

@@ -37,7 +37,9 @@ const MODULE_OPTIONS = [
 ];
 
 export function UsersPage() {
-  const { role: authRole, isSuperAdmin } = useAuth();
+  const { user } = useAuth();
+  const authRole = user?.role;
+  const isSuperAdmin = user?.isSuperAdmin;
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -170,7 +172,7 @@ export function UsersPage() {
               Type de compte
               <select value={newRole} onChange={e => setNewRole(e.target.value as any)}>
                 <option value="COLLABORATOR">Collaborateur (Gestion de dossiers)</option>
-                <option value="ADMIN">Administrateur (Accès complet)</option>
+                <option value="ADMIN">Associé (Accès complet)</option>
               </select>
             </label>
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -266,7 +268,7 @@ export function UsersPage() {
               style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #ddd' }}
             >
               <option value="ALL">Tous</option>
-              <option value="ADMIN">Administrateurs</option>
+              <option value="ADMIN">Associés</option>
               <option value="COLLABORATOR">Collaborateurs</option>
             </select>
           </div>
@@ -281,7 +283,7 @@ export function UsersPage() {
             />
           </div>
           
-          {authRole === 'ADMIN' && (
+          {isSuperAdmin && (
             <button
               onClick={() => setShowAddModal(true)}
               className="btn btn-primary"
@@ -344,7 +346,7 @@ export function UsersPage() {
                         border: 'none',
                         fontSize: '0.75rem'
                       }}>
-                        {u.role}
+                        {u.isSuperAdmin ? 'SUPER ADMIN' : u.role === 'ADMIN' ? 'ASSOCIÉ' : 'COLLABORATEUR'}
                       </span>
                     </td>
                     <td style={{ color: '#64748b' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
@@ -373,7 +375,7 @@ export function UsersPage() {
                             <Shield size={18} style={{ opacity: 0.7 }} />
                           </button>
                         )}
-                        {(u.role !== 'ADMIN' || isSuperAdmin) && (
+                        {isSuperAdmin && (
                           <button className="ghost delete-btn" onClick={() => handleDeleteUser(u.id, u.role)} style={{ padding: '0.4rem' }}>
                             <Trash2 size={18} />
                           </button>
