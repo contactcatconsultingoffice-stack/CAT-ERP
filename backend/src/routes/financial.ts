@@ -39,10 +39,17 @@ router.post('/', requireAuth, requirePermission('financial'), asyncHandler(async
     kind, amountHT, amountTTC, currency, status, dueDate, projectId, externalRef, lines, paymentTerms
   } = req.body;
 
+  if (!['QUOTE', 'INVOICE', 'EXPENSE'].includes(kind)) {
+    return res.status(400).json({ error: 'Invalid document kind' });
+  }
+
   let ref = externalRef;
   if (!ref) {
     const year = new Date().getFullYear();
-    const prefix = kind === 'QUOTE' ? 'DEV' : 'FAC';
+    let prefix = 'FAC';
+    if (kind === 'QUOTE') prefix = 'DEV';
+    if (kind === 'EXPENSE') prefix = 'DEP';
+    
     const count = await prisma.financialRecord.count({ where: { kind } });
     const seq = String(count + 1).padStart(3, '0');
     ref = `${prefix}-${year}-${seq}`;

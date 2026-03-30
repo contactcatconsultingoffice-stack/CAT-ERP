@@ -16,12 +16,6 @@ type FinancialRecord = {
   issuedAt: string;
 };
 
-type Mission = { hours: number };
-type Client = { id: string };
-type Project = { status: 'PLANNING' | 'IN_PROGRESS' | 'COMPLETED' | 'ON_HOLD' };
-type Partner = { id: string };
-type Collaborator = { id: string };
-
 const STATUS_COLORS = {
   PLANNING: '#94a3b8',
   IN_PROGRESS: '#6366f1',
@@ -58,7 +52,7 @@ export function DashboardPage() {
     queryFn: async () => {
       const results = await Promise.allSettled([
         api.get<any>('/dashboard/summary'),
-        api.get<any>('/financial?limit=1000&status=PAID&kind=INVOICE'), // Still need this for revenue chart
+        api.get<any>('/financial?limit=1000&status=PAID&kind=INVOICE'),
       ]);
 
       const [sumRes, finRes] = results;
@@ -80,7 +74,7 @@ export function DashboardPage() {
 
   const counts = summary?.counts || {};
   const statusCounts = counts.status || {};
-  const countsByStatus = statusCounts; // For backward compatibility with the JSX below
+  const countsByStatus = statusCounts;
 
   const toUSD = (amount: number, curr: string) => {
     if (curr === 'USD' || !rates[curr]) return amount;
@@ -110,6 +104,7 @@ export function DashboardPage() {
   };
 
   const statusData = processStatusData();
+  const revenueData = processRevenueData();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -130,7 +125,7 @@ export function DashboardPage() {
     <div className="page">
       <header className="page-header">
         <h1>Dashboard</h1>
-        <p>Vue d&apos;ensemble rapide de l&apos;activité CAT Consulting.</p>
+        <p>Vue d'ensemble rapide de l'activité CAT Consulting.</p>
       </header>
 
       {hasErrors && (
@@ -141,7 +136,6 @@ export function DashboardPage() {
       )}
 
       <motion.section 
-        className="card"
         variants={containerVariants}
         initial="hidden"
         animate="show"
@@ -149,81 +143,81 @@ export function DashboardPage() {
         {isLoading ? (
           <KpiSkeleton count={4} />
         ) : (
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.PLANNING }}>
-              <h3>Planifiés</h3>
-              <p><AnimatedNumber value={countsByStatus.PLANNING || 0} /></p>
-            </motion.div>
-            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.IN_PROGRESS }}>
-              <h3>En cours</h3>
-              <p><AnimatedNumber value={countsByStatus.IN_PROGRESS || 0} /></p>
-            </motion.div>
-            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.ON_HOLD }}>
-              <h3>En pause</h3>
-              <p><AnimatedNumber value={countsByStatus.ON_HOLD || 0} /></p>
-            </motion.div>
-            <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.COMPLETED }}>
-              <h3>Terminés</h3>
-              <p><AnimatedNumber value={countsByStatus.COMPLETED || 0} /></p>
-            </motion.div>
-          </div>
-        )}
-        
-        {!isLoading && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '2rem', marginTop: '2rem' }}>
-            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Statistiques Globales</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Nombre de Projets</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.projects || 0} /></span>
+          <>
+            <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '1.5rem' }}>
+              <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.PLANNING }}>
+                <h3>Planifiés</h3>
+                <p><AnimatedNumber value={countsByStatus.PLANNING || 0} /></p>
+              </motion.div>
+              <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.IN_PROGRESS }}>
+                <h3>En cours</h3>
+                <p><AnimatedNumber value={countsByStatus.IN_PROGRESS || 0} /></p>
+              </motion.div>
+              <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.ON_HOLD }}>
+                <h3>En pause</h3>
+                <p><AnimatedNumber value={countsByStatus.ON_HOLD || 0} /></p>
+              </motion.div>
+              <motion.div variants={itemVariants} className="kpi" style={{ borderLeftColor: STATUS_COLORS.COMPLETED }}>
+                <h3>Terminés</h3>
+                <p><AnimatedNumber value={countsByStatus.COMPLETED || 0} /></p>
+              </motion.div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 1.2fr) minmax(260px, 1fr)', gap: '1.5rem', alignItems: 'stretch' }}>
+              <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1.25rem', color: 'var(--text-primary)', fontWeight: 600 }}>Statistiques Globales</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                  <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Nombre de Projets</span>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}><AnimatedNumber value={counts.projects || 0} /></div>
+                  </div>
+                  <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Clients actifs</span>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}><AnimatedNumber value={counts.clients || 0} /></div>
+                  </div>
+                  <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Collaborateurs</span>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}><AnimatedNumber value={counts.collaborators || 0} /></div>
+                  </div>
+                  <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Partenaires</span>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '1.25rem' }}><AnimatedNumber value={counts.partners || 0} /></div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Partenaires</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.partners || 0} /></span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Collaborateurs</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.collaborators || 0} /></span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', background: 'var(--bg-main)', borderRadius: '0.75rem', border: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Clients</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}><AnimatedNumber value={counts.clients || 0} /></span>
-                </div>
-              </div>
-            </motion.div>
-            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem', gridColumn: '1 / -1', maxWidth: '600px', justifySelf: 'center', width: '100%' }}>
-              <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600, textAlign: 'center' }}>Répartition par Statut</h3>
-              
-              {statusData.length === 0 ? (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                  Aucun projet actif.
-                </div>
-              ) : (
-                <div style={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={statusData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {statusData.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip contentStyle={{background: 'var(--bg-sidebar)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-main)', color: 'var(--text-primary)'}} />
-                      <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{color: 'var(--text-secondary)'}} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </motion.div>
-          </div>
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1.25rem', color: 'var(--text-primary)', fontWeight: 600 }}>Répartition par Statut</h3>
+                {statusData.length === 0 ? (
+                  <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                    Aucun projet actif.
+                  </div>
+                ) : (
+                  <div style={{ height: 320 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={statusData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={6}
+                          dataKey="value"
+                        >
+                          {statusData.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{background: 'var(--bg-sidebar)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-main)', color: 'var(--text-primary)'}} />
+                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{color: 'var(--text-secondary)'}} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          </>
         )}
       </motion.section>
     </div>

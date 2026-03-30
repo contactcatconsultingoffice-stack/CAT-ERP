@@ -180,6 +180,7 @@ enum ProspectStatus {
 enum FinancialKind {
   QUOTE
   INVOICE
+  EXPENSE
 }
 
 enum PaymentStatus {

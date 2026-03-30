@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { 
@@ -7,6 +8,8 @@ import {
   User, 
   Briefcase, 
   Layers,
+  List,
+  LayoutPanelTop,
   X,
   Calendar,
   Hash
@@ -99,6 +102,7 @@ export function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'BOARD' | 'LIST'>('BOARD');
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -271,19 +275,50 @@ export function ProjectsPage() {
     <div className="page">
       <header className="page-header">
         <h1>Projets</h1>
-        <p>Kanban interactif — déplacez les cartes ou cliquez pour les détails.</p>
+        <p>Vue unifiée : Kanban pour le suivi temps-réel et liste pour la lecture rapide.</p>
       </header>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div className="search-box">
-          <input 
-            type="text" 
-            placeholder="Rechercher par référence, projet, client..." 
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+          <div className="segmented" style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: '12px', padding: '0.3rem', border: '1px solid var(--border-color)' }}>
+            <button 
+              className={`ghost ${viewMode === 'BOARD' ? 'active' : ''}`} 
+              onClick={() => setViewMode('BOARD')}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '10px',
+                fontWeight: 600, fontSize: '0.9rem',
+                background: viewMode === 'BOARD' ? 'var(--accent-primary)' : 'transparent',
+                color: viewMode === 'BOARD' ? '#fff' : 'var(--text-secondary)'
+              }}
+            >
+              <LayoutPanelTop size={18} /> Kanban Board
+            </button>
+            <button 
+              className={`ghost ${viewMode === 'LIST' ? 'active' : ''}`} 
+              onClick={() => setViewMode('LIST')}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '10px',
+                fontWeight: 600, fontSize: '0.9rem',
+                background: viewMode === 'LIST' ? 'var(--accent-primary)' : 'transparent',
+                color: viewMode === 'LIST' ? '#fff' : 'var(--text-secondary)'
+              }}
+            >
+              <List size={18} /> Project List
+            </button>
+          </div>
+          
+          <div className="search-box" style={{ width: '320px' }}>
+            <input 
+              type="text" 
+              placeholder="Search projects, clients or refs..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ borderRadius: '12px' }}
+            />
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <ExportButtons 
             data={filtered.map(p => ({
               Référence: p.reference || 'N/A',
@@ -294,17 +329,16 @@ export function ProjectsPage() {
               Client: p.client?.name || 'Inconnu',
               Partenaire: p.partner?.name || 'Aucun',
               Créé_le: new Date(p.createdAt).toLocaleDateString('fr-FR')
-            }))}
+            }))} 
             filename="projets"
           />
           {role === 'ADMIN' && (
-            <button className="btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>
-              <Plus size={18} /> Nouveau Projet
+            <button className="btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }} style={{ borderRadius: '10px', padding: '0.7rem 1.2rem' }}>
+              <Plus size={18} /> New Project
             </button>
           )}
         </div>
       </div>
-
       {showAddModal && (
         <section className="card glass-card" style={{ marginBottom: '2rem' }}>
           <h2>{isEditing ? 'Modifier le projet' : 'Créer un nouveau projet'}</h2>
@@ -378,203 +412,341 @@ export function ProjectsPage() {
         </section>
       )}
 
-      <div className="kanban-board">
-        {columns.map(statusKey => {
-          const columnProjects = filtered.filter(p => p.status === statusKey);
-          const visibleProjects = columnProjects.slice(0, 3);
-          const hiddenProjects = columnProjects.slice(3);
-          return (
-            <div 
-              key={statusKey} 
-              className="kanban-column"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, statusKey)}
-            >
-              <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className={"status status-" + statusKey.toLowerCase()}>{STATUS_LABELS[statusKey]}</span>
-                <span style={{ background: 'var(--bg-input)', padding: '0.1rem 0.6rem', borderRadius: '1rem', color: 'var(--text-primary)' }}>{columnProjects.length}</span>
-              </h3>
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '150px' }}>
-                {visibleProjects.map(project => (
-                  <div 
-                    key={project.id} 
-                    className="project-card"
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, project.id)}
-                    onDragEnd={handleDragEnd}
-                    onClick={() => setSelectedProject(project)}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-accent)', fontSize: '0.75rem', fontWeight: 600 }}>
-                        <Hash size={12} /> {project.reference || 'PRJ-N/A'}
-                        <span style={{ 
-                          width: '8px', 
-                          height: '8px', 
-                          borderRadius: '50%', 
-                          background: PRIORITY_COLORS[project.priority],
-                          marginLeft: '4px'
-                        }} title={`Priorité: ${PRIORITY_LABELS[project.priority]}`} />
-                      </div>
+        {viewMode === 'LIST' && (
+          <div className="card" style={{ padding: '1.25rem', marginBottom: '2rem', overflowX: 'auto' }}>
+            <table className="table" style={{ minWidth: '840px' }}>
+              <thead>
+                <tr>
+                  <th>R?f</th>
+                  <th>Projet</th>
+                  <th>Client</th>
+                  <th>Statut</th>
+                  <th>Priorit?</th>
+                  <th>Type</th>
+                  <th>Cr??</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => (
+                  <tr key={p.id} onClick={() => setSelectedProject(p)} style={{ cursor: 'pointer' }}>
+                    <td style={{ color: 'var(--text-accent)', fontWeight: 600 }}>{p.reference || 'PRJ-N/A'}</td>
+                    <td>{p.name}</td>
+                    <td>{p.client?.name || 'Client inconnu'}</td>
+                    <td>
                       <select 
-                        value={project.status}
-                        onChange={(e) => { e.stopPropagation(); handleStatusChange(project.id, e.target.value as ProjectStatus); }}
+                        value={p.status}
                         onClick={e => e.stopPropagation()}
-                        className={"status status-" + project.status.toLowerCase()}
-                        style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', cursor: 'pointer', outline: 'none' }}
+                        onChange={e => handleStatusChange(p.id, e.target.value as ProjectStatus)}
+                        className={"status status-" + p.status.toLowerCase()}
+                        style={{ fontSize: '0.8rem' }}
                       >
                         {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                          <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
+                          <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
-                    </div>
-
-                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: 'var(--text-primary)' }}>{project.name}</h4>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
-                      <User size={14} /> {project.client?.name || 'Client inconnu'}
-                    </div>
-
-                    {project.description && (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        {project.description}
-                      </p>
-                    )}
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <Briefcase size={12} /> {project.type}
-                      </span>
-                      <select 
-                        value={project.priority}
-                        onChange={(e) => { e.stopPropagation(); handlePriorityChange(project.id, e.target.value as Priority); }}
+                    </td>
+                    <td>
+                      <select
+                        value={p.priority}
                         onClick={e => e.stopPropagation()}
-                        style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: PRIORITY_COLORS[project.priority], borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                        onChange={e => handlePriorityChange(p.id, e.target.value as Priority)}
+                        style={{ fontSize: '0.8rem', color: PRIORITY_COLORS[p.priority], background: 'var(--bg-input)' }}
                       >
                         {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
-                          <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
+                          <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
+                    </td>
+                    <td>{TYPE_LABELS[p.type]}</td>
+                    <td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td>
+                    <td style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                      <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(p); setSelectedProject(null); }}>
+                        <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                      </button>
                       {role === 'ADMIN' && (
-                        <div style={{ display: 'flex', gap: '0.3rem' }}>
-                          <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(project); }} style={{ padding: '0.2rem' }} title="Modifier">
-                            <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
-                          </button>
-                          <button className="ghost delete-btn" onClick={(e) => handleDelete(project.id, e)} style={{ padding: '0.2rem' }}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                        <button className="ghost delete-btn" onClick={(e) => handleDelete(p.id, e)}>
+                          <Trash2 size={14} />
+                        </button>
                       )}
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-                {hiddenProjects.length > 0 && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.25rem 0.5rem', fontWeight: 600, textTransform: 'uppercase' }}>
-                      Autres projets (+{hiddenProjects.length})
-                    </p>
-                    {hiddenProjects.map(project => (
-                      <div 
-                        key={project.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, project.id)}
-                        onDragEnd={handleDragEnd}
-                        onClick={() => setSelectedProject(project)}
-                        style={{ 
-                          background: 'var(--bg-card)', 
-                          padding: '0.6rem 0.8rem', 
-                          borderRadius: 'var(--radius-sm)', 
-                          cursor: 'pointer', 
-                          border: '1px solid var(--border-color)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          fontSize: '0.85rem',
-                          transition: 'border-color var(--transition-fast)'
-                        }}
-                        onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--border-color-active)')}
-                        onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                          <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {project.name}
-                          </span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{TYPE_LABELS[project.type]}</span>
-                            {project.subType && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>• {project.subType}</span>}
-                          </div>
-                        </div>
-                        <span style={{ color: 'var(--text-accent)', fontSize: '0.7rem', flexShrink: 0 }}>{project.reference}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        {viewMode === 'BOARD' && (
+        <div className="kanban-board">
+          {columns.map(statusKey => {
+            const columnProjects = filtered.filter(p => p.status === statusKey);
+            const visibleProjects = columnProjects.slice(0, 3);
+            const hiddenProjects = columnProjects.slice(3);
+            return (
+              <div 
+                key={statusKey} 
+                className="kanban-column"
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, statusKey)}
+              >
+                <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span className={"status status-" + statusKey.toLowerCase()}>{STATUS_LABELS[statusKey]}</span>
+                  <span style={{ background: 'var(--bg-input)', padding: '0.1rem 0.6rem', borderRadius: '1rem', color: 'var(--text-primary)' }}>{columnProjects.length}</span>
+                </h3>
                 
-                {columnProjects.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                    Glissez un projet ici
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '150px' }}>
+                  {visibleProjects.map(project => (
+                    <div 
+                      key={project.id} 
+                      className="project-card"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, project.id)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => setSelectedProject(project)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-accent)', fontSize: '0.75rem', fontWeight: 600 }}>
+                          <Hash size={12} /> {project.reference || 'PRJ-N/A'}
+                          <span style={{ 
+                            width: '8px', 
+                            height: '8px', 
+                            borderRadius: '50%', 
+                            background: PRIORITY_COLORS[project.priority],
+                            marginLeft: '4px'
+                          }} title={`Priorit?: ${PRIORITY_LABELS[project.priority]}`} />
+                        </div>
+                        <select 
+                          value={project.status}
+                          onChange={(e) => { e.stopPropagation(); handleStatusChange(project.id, e.target.value as ProjectStatus); }}
+                          onClick={e => e.stopPropagation()}
+                          className={"status status-" + project.status.toLowerCase()}
+                          style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', cursor: 'pointer', outline: 'none' }}
+                        >
+                          {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                            <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
 
+                      <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: 'var(--text-primary)' }}>{project.name}</h4>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                        <User size={14} /> {project.client?.name || 'Client inconnu'}
+                      </div>
+
+                      {project.description && (
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {project.description}
+                        </p>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: 'auto' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          <Briefcase size={12} /> {project.type}
+                        </span>
+                        <select 
+                          value={project.priority}
+                          onChange={(e) => { e.stopPropagation(); handlePriorityChange(project.id, e.target.value as Priority); }}
+                          onClick={e => e.stopPropagation()}
+                          style={{ fontSize: '0.7rem', padding: '0.1rem 0.3rem', background: 'var(--bg-input)', border: '1px solid var(--border-color)', color: PRIORITY_COLORS[project.priority], borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+                        >
+                          {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                            <option key={val} value={val} style={{ color: 'inherit', background: 'var(--bg-main)' }}>{label}</option>
+                          ))}
+                        </select>
+                        {role === 'ADMIN' && (
+                          <div style={{ display: 'flex', gap: '0.3rem' }}>
+                            <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(project); }} style={{ padding: '0.2rem' }} title="Modifier">
+                              <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                            </button>
+                            <button className="ghost delete-btn" onClick={(e) => handleDelete(project.id, e)} style={{ padding: '0.2rem' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {hiddenProjects.length > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '0 0 0.25rem 0.5rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                        Autres projets (+{hiddenProjects.length})
+                      </p>
+                      {hiddenProjects.map(project => (
+                        <div 
+                          key={project.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, project.id)}
+                          onDragEnd={handleDragEnd}
+                          onClick={() => setSelectedProject(project)}
+                          style={{ 
+                            background: 'var(--bg-card)', 
+                            padding: '0.6rem 0.8rem', 
+                            borderRadius: 'var(--radius-sm)', 
+                            cursor: 'pointer', 
+                            border: '1px solid var(--border-color)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            fontSize: '0.85rem',
+                            transition: 'border-color var(--transition-fast)'
+                          }}
+                          onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--border-color-active)')}
+                          onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--border-color)')}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                            <span style={{ color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {project.name}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{TYPE_LABELS[project.type]}</span>
+                              {project.subType && <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)', fontWeight: 600 }}>? {project.subType}</span>}
+                            </div>
+                          </div>
+                          <span style={{ color: 'var(--text-accent)', fontSize: '0.7rem', flexShrink: 0 }}>{project.reference}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {columnProjects.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                      Glissez un projet ici
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        )}
       {/* Project Details Modal */}
       {selectedProject && (
-        <div className="mobile-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '1rem' }} onClick={() => setSelectedProject(null)}>
-          <div className="card glass-card" style={{ width: '100%', maxWidth: '600px', padding: '2rem', maxHeight: '90dvh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-              <div>
-                <div style={{ color: 'var(--text-accent)', fontSize: '0.9rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                  <Hash size={16} /> {selectedProject.reference || 'PRJ-N/A'}
+        <div className="mobile-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '2rem 1rem', background: 'rgba(0,0,0,0.2)', overflowY: 'auto' }} onClick={() => setSelectedProject(null)}>
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }} 
+            animate={{ scale: 1, opacity: 1 }}
+            className="card" 
+            style={{ width: '100%', maxWidth: '1000px', padding: 0, minHeight: 'min-content', maxHeight: 'max-content', margin: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '24px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden', background: 'var(--bg-main)' }} 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ padding: '1.5rem 2rem', background: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', borderRadius: '12px' }}>
+                  <Briefcase size={24} />
                 </div>
-                <h2 style={{ fontSize: '1.75rem', margin: 0 }}>{selectedProject.name}</h2>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-accent)', letterSpacing: '0.05em' }}>{selectedProject.reference || 'PRJ-N/A'}</span>
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--text-muted)' }}></span>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{TYPE_LABELS[selectedProject.type]}</span>
+                  </div>
+                  <h2 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 700 }}>{selectedProject.name}</h2>
+                </div>
               </div>
-              <button className="ghost" onClick={() => setSelectedProject(null)} style={{ padding: '0.5rem' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem', padding: '1.5rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
-              <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Client</p>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedProject.client?.name}</div>
-                {selectedProject.client?.email && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{selectedProject.client.email}</div>}
-              </div>
-              
-              <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact</p>
-                <div style={{ color: 'var(--text-primary)' }}>{selectedProject.contact || selectedProject.client?.contact || 'N/A'}</div>
-              </div>
-
-              <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Partenaire</p>
-                <div style={{ color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Layers size={14} /> {selectedProject.partner?.name || 'Aucun'}</div>
-              </div>
-
-              <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Date de création</p>
-                <div style={{ color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Calendar size={14} /> {new Date(selectedProject.createdAt).toLocaleDateString('fr-FR')}</div>
-              </div>
-
-              <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priorité</p>
-                <div style={{ color: PRIORITY_COLORS[selectedProject.priority], fontWeight: 600 }}>{PRIORITY_LABELS[selectedProject.priority]}</div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {role === 'ADMIN' && (
+                  <button className="ghost" onClick={() => { openEditModal(selectedProject); setSelectedProject(null); }} style={{ padding: '0.5rem', borderRadius: '8px' }} title="Edit">
+                    <Plus size={20} style={{ transform: 'rotate(45deg)' }} />
+                  </button>
+                )}
+                <button className="ghost" onClick={() => setSelectedProject(null)} style={{ padding: '0.5rem', borderRadius: '8px' }}>
+                  <X size={24} />
+                </button>
               </div>
             </div>
 
-            <div style={{ marginBottom: '1rem' }}>
-              <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Description détaillée</p>
-              <div style={{ padding: '1.5rem', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.95rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
-                {selectedProject.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Aucune description fournie.</span>}
+            {/* Modal Content */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', flex: 1, overflow: 'hidden' }}>
+              {/* Left Column: Details & Comments */}
+              <div style={{ padding: '2rem', overflowY: 'auto', borderRight: '1px solid var(--border-color)' }}>
+                <section style={{ marginBottom: '2.5rem' }}>
+                  <h4 style={{ fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em', fontWeight: 600 }}>Description du projet</h4>
+                  <div style={{ color: 'var(--text-primary)', fontSize: '1rem', lineHeight: '1.7', whiteSpace: 'pre-wrap', background: 'var(--bg-main)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    {selectedProject.description || <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Aucune description détaillée.</span>}
+                  </div>
+                </section>
+
+                <section>
+                  <h4 style={{ fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', letterSpacing: '0.05em', fontWeight: 600 }}>Fil d'actualité & Commentaires</h4>
+                  <CommentsPanel entityType="PROJECT" entityId={selectedProject.id} />
+                </section>
+              </div>
+
+              {/* Right Column: Metadata & Controls */}
+              <div style={{ padding: '2rem', background: 'var(--bg-main)', overflowY: 'auto' }}>
+                <div style={{ display: 'grid', gap: '1.5rem' }}>
+                  <div>
+                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600 }}>Statut & Priorité</h4>
+                    <div style={{ display: 'grid', gap: '0.75rem' }}>
+                      <select 
+                        value={selectedProject.status}
+                        onChange={(e) => handleStatusChange(selectedProject.id, e.target.value as ProjectStatus)}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
+                      >
+                        {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                          <option key={val} value={val}>{label}</option>
+                        ))}
+                      </select>
+                      <select 
+                        value={selectedProject.priority}
+                        onChange={(e) => handlePriorityChange(selectedProject.id, e.target.value as Priority)}
+                        style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: PRIORITY_COLORS[selectedProject.priority], fontWeight: 600, fontSize: '0.9rem' }}
+                      >
+                        {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                          <option key={val} value={val}>{label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 600 }}>Informations Clientes</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ padding: '0.5rem', background: 'rgba(99, 102, 241, 0.1)', color: 'var(--accent-primary)', borderRadius: '8px' }}><User size={18} /></div>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{selectedProject.client?.name}</p>
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Client Principal</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ padding: '0.5rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', borderRadius: '8px' }}><Hash size={18} /></div>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{selectedProject.contact || 'N/A'}</p>
+                          <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Interlocuteur</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 600 }}>Partenariat</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ padding: '0.5rem', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', borderRadius: '8px' }}><Layers size={18} /></div>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{selectedProject.partner?.name || 'Aucun partenaire'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                    <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: 600 }}>Dates Clés</h4>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <div style={{ padding: '0.5rem', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', borderRadius: '8px' }}><Calendar size={18} /></div>
+                      <div>
+                        <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{new Date(selectedProject.createdAt).toLocaleDateString('fr-FR')}</p>
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Création du projet</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <CommentsPanel entityType="PROJECT" entityId={selectedProject.id} />
-          </div>
+          </motion.div>
         </div>
       )}
     </div>

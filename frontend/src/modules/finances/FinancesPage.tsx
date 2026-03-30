@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -18,11 +18,13 @@ import {
 import { motion } from 'framer-motion';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { KpiSkeleton } from '../../components/Skeleton';
+import { useToast } from '../../components/Toast';
 
 type FinancialRecord = {
   id: string;
-  kind: 'QUOTE' | 'INVOICE';
+  kind: 'QUOTE' | 'INVOICE' | 'EXPENSE';
   amountTTC: string;
+  amountHT: string;
   currency: string;
   status: 'READY_TO_SEND' | 'SENT' | 'PENDING' | 'PAID' | 'LATE';
   issuedAt: string;
@@ -33,6 +35,17 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'
 
 export function FinancesPage() {
   const [timeRange, setTimeRange] = useState('ALL');
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [txType, setTxType] = useState<'INCOME' | 'EXPENSE'>('INCOME');
+  const [txAmount, setTxAmount] = useState(0);
+  const [txCurrency, setTxCurrency] = useState('USD');
+  const [txStatus, setTxStatus] = useState<FinancialRecord['status']>('PAID');
+  const [txProjectId, setTxProjectId] = useState('');
+  const [txDescription, setTxDescription] = useState('');
+  const [isSavingTx, setIsSavingTx] = useState(false);
+
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: financialData, isLoading } = useQuery({
     queryKey: ['financesSummary', timeRange],
@@ -47,6 +60,14 @@ export function FinancesPage() {
     queryFn: async () => {
       const res = await api.get<{ rates: Record<string, number> }>('/rates');
       return res.rates || { USD: 1, TND: 3.1 };
+    }
+  });
+
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects-mini'],
+    queryFn: async () => {
+      const res = await api.get<{ data: { id: string; name: string }[] }>('/projects');
+      return Array.isArray(res) ? res : (res as any).data || [];
     }
   });
 
@@ -84,7 +105,8 @@ export function FinancesPage() {
   const processCashflow = () => {
     const dataMap: Record<string, { in: number, out: number }> = {};
     const invoices = (financialData as FinancialRecord[])?.filter((f: FinancialRecord) => f.kind === 'INVOICE') || [];
-    
+    const quotes = (financialData as FinancialRecord[])?.filter((f: FinancialRecord) => f.kind === 'QUOTE') || [];
+
     invoices.forEach((f: FinancialRecord) => {
       if (!f.issuedAt) return;
       const date = new Date(f.issuedAt);
@@ -95,8 +117,14 @@ export function FinancesPage() {
       if (f.status === 'PAID') {
         dataMap[monthStr].in += toUSD(Number(f.amountTTC), f.currency);
       }
-      // dummy out value
-      dataMap[monthStr].out = dataMap[monthStr].in * 0.35;
+    });
+
+    quotes.forEach((f: FinancialRecord) => {
+      if (!f.issuedAt) return;
+      const date = new Date(f.issuedAt);
+      const monthStr = date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+      if (!dataMap[monthStr]) dataMap[monthStr] = { in: 0, out: 0 };
+      dataMap[monthStr].out += toUSD(Number(f.amountTTC), f.currency);
     });
 
     return Object.entries(dataMap).map(([name, vals]) => ({ name, ...vals })).reverse();
@@ -105,10 +133,52 @@ export function FinancesPage() {
   const revenueByMonth = processRevenueByMonth();
   const revenueByType = processRevenueByType();
   const cashflowData = processCashflow();
+  const projects = (projectsData as any[]) || [];
 
-  const totalRevenue = revenueByMonth.reduce((acc, curr) => acc + curr.total, 0);
-  const pendingRevenue = (financialData as FinancialRecord[])?.filter((f: FinancialRecord) => f.kind === 'INVOICE' && f.status !== 'PAID')
-    .reduce((acc: number, curr: FinancialRecord) => acc + toUSD(Number(curr.amountTTC), curr.currency), 0) || 0;
+  const records = (financialData as FinancialRecord[]) || [];
+  const totalRevenue = records.filter(f => f.kind === 'INVOICE' && f.status === 'PAID')
+    .reduce((acc, curr) => acc + toUSD(Number(curr.amountTTC), curr.currency), 0);
+  
+  const pendingRevenue = records.filter(f => f.kind === 'INVOICE' && f.status !== 'PAID')
+    .reduce((acc, curr) => acc + toUSD(Number(curr.amountTTC), curr.currency), 0);
+    
+  const totalExpenses = records.filter(f => f.kind === 'EXPENSE')
+    .reduce((acc, curr) => acc + toUSD(Number(curr.amountTTC), curr.currency), 0);
+  
+  const estimatedExpenses = totalExpenses; // Now directly linked to EXPENSE records
+  const operationalMargin = totalRevenue > 0 ? Math.max(0, ((totalRevenue - totalExpenses) / totalRevenue) * 100) : 0;
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (txAmount <= 0) return;
+    setIsSavingTx(true);
+    try {
+      await api.post('/financial', {
+        kind: txType === 'INCOME' ? 'INVOICE' : 'EXPENSE',
+        projectId: txProjectId || undefined,
+        amountHT: txAmount,
+        amountTTC: txAmount,
+        currency: txCurrency,
+        status: txStatus,
+        lines: [
+          { id: 1, description: txDescription || `Transaction ${txType === 'INCOME' ? 'revenu' : 'dépense'}`, quantity: 1, unitPrice: txAmount }
+        ]
+      });
+      showToast('Transaction enregistrée', 'success');
+      setShowTransactionModal(false);
+      setTxAmount(0);
+      setTxDescription('');
+      setTxProjectId('');
+      setTxStatus('PAID');
+      setTxType('INCOME');
+      queryClient.invalidateQueries({ queryKey: ['financesSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['financial'] });
+    } catch (err) {
+      showToast('Enregistrement impossible. Vérifiez les champs.', 'error');
+    } finally {
+      setIsSavingTx(false);
+    }
+  };
 
   if (isLoading) return <div className="page"><KpiSkeleton count={4} /></div>;
 
@@ -158,8 +228,8 @@ export function FinancesPage() {
               <DollarSign size={18} />
             </div>
           </div>
-          <p style={{ fontSize: '1.75rem', fontWeight: 700 }}>65%</p>
-          <span style={{ fontSize: '0.8rem', color: '#10b981' }}>Optimisé ce trimestre</span>
+          <p style={{ fontSize: '1.75rem', fontWeight: 700 }}>{operationalMargin.toFixed(1)}%</p>
+          <span style={{ fontSize: '0.8rem', color: '#10b981' }}>Calcul : (encaissé - devis/dépenses) / encaissé</span>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="kpi card">
@@ -169,9 +239,9 @@ export function FinancesPage() {
               <TrendingDown size={18} />
             </div>
           </div>
-          <p style={{ fontSize: '1.75rem', fontWeight: 700 }}>$<AnimatedNumber value={totalRevenue * 0.35} /></p>
+          <p style={{ fontSize: '1.75rem', fontWeight: 700 }}>$<AnimatedNumber value={estimatedExpenses} /></p>
           <span style={{ fontSize: '0.8rem', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-            <ArrowDownRight size={14} /> Stable
+            <ArrowDownRight size={14} /> Basé sur les devis et transactions manuelles
           </span>
         </motion.div>
       </section>
@@ -261,7 +331,7 @@ export function FinancesPage() {
       <section className="card glass-card" style={{ marginTop: '2rem', padding: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3>Dernières Transactions Financières</h3>
-          <button className="btn-primary" style={{ fontSize: '0.85rem' }}>+ Nouvelle Transaction Manuel</button>
+          <button className="btn-primary" style={{ fontSize: '0.85rem' }} onClick={() => setShowTransactionModal(true)}>+ Nouvelle Transaction Manuel</button>
         </div>
         <table className="table">
           <thead>
@@ -278,15 +348,75 @@ export function FinancesPage() {
             {(financialData as FinancialRecord[])?.slice(0, 10).map((f: FinancialRecord) => (
               <tr key={f.id}>
                 <td>{new Date(f.issuedAt).toLocaleDateString()}</td>
-                <td><span className={f.kind === 'INVOICE' ? 'status status-completed' : 'status status-planning'}>{f.kind}</span></td>
-                <td>Paiement Client - {f.project?.type || 'Projet'}</td>
-                <td>Revenu Prestation</td>
-                <td style={{ fontWeight: 600 }}>{f.amountTTC} {f.currency}</td>
+                <td><span className={f.kind === 'INVOICE' ? 'status status-completed' : f.kind === 'EXPENSE' ? 'status status-paid' : 'status status-planning'}>{f.kind}</span></td>
+                <td>{f.kind === 'INVOICE' ? 'Paiement Client' : f.kind === 'EXPENSE' ? 'Dépense / Frais' : 'Devis'} - {f.project?.type || 'Projet'}</td>
+                <td>{f.kind === 'INVOICE' ? 'Revenu Prestation' : 'Frais Opérationnels'}</td>
+                <td style={{ fontWeight: 600, color: f.kind === 'EXPENSE' ? '#ef4444' : 'inherit' }}>{f.kind === 'EXPENSE' ? '-' : ''}{f.amountTTC} {f.currency}</td>
                 <td><span className={"status status-" + f.status.toLowerCase()}>{f.status}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
+
+      {showTransactionModal && (
+        <div className="mobile-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowTransactionModal(false)}>
+          <div className="card glass-card" style={{ width: '100%', maxWidth: '520px', padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0 }}>Nouvelle transaction manuelle</h3>
+              <button className="ghost" onClick={() => setShowTransactionModal(false)}><ArrowDownRight size={18} style={{ transform: 'rotate(135deg)' }} /></button>
+            </div>
+            <form onSubmit={handleCreateTransaction} className="form-grid">
+              <label>
+                Type
+                <select value={txType} onChange={e => setTxType(e.target.value as 'INCOME' | 'EXPENSE')}>
+                  <option value="INCOME">Entrée (Facture)</option>
+                  <option value="EXPENSE">Dépense (Transaction directe)</option>
+                </select>
+              </label>
+              <label>
+                Montant
+                <input type="number" min="0" step="0.01" value={txAmount} onChange={e => setTxAmount(Number(e.target.value))} required />
+              </label>
+              <label>
+                Devise
+                <select value={txCurrency} onChange={e => setTxCurrency(e.target.value)}>
+                  {Object.keys(rates || { USD: 1 }).map(code => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Statut
+                <select value={txStatus} onChange={e => setTxStatus(e.target.value as FinancialRecord['status'])}>
+                  <option value="PAID">Pay?</option>
+                  <option value="PENDING">En attente</option>
+                  <option value="SENT">Envoy?</option>
+                </select>
+              </label>
+              <label>
+                Projet (optionnel)
+                <select value={txProjectId} onChange={e => setTxProjectId(e.target.value)}>
+                  <option value="">Non li?</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                Description
+                <textarea value={txDescription} onChange={e => setTxDescription(e.target.value)} placeholder="Ex: acompte, frais logiciel..." rows={3} />
+              </label>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                <button type="submit" className="btn-primary" disabled={isSavingTx}>
+                  {isSavingTx ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+                <button type="button" className="ghost" onClick={() => setShowTransactionModal(false)} disabled={isSavingTx}>Annuler</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       </section>
     </div>
   );
