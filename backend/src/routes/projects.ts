@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requirePermission } from '../auth';
-import { validateRequest, ProjectSchema } from '../utils/validation';
+import { validateRequest, ProjectSchema, ProjectUpdateSchema } from '../utils/validation';
 import { asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
 
@@ -33,7 +33,7 @@ router.get('/', requireAuth, asyncHandler(async (req: Request, res: Response) =>
   const [data, totalCount] = await Promise.all([
     prisma.project.findMany({
       where,
-      include: { client: { select: { id: true, name: true, email: true } }, partner: { select: { id: true, name: true } } },
+      include: { client: { select: { id: true, name: true, contact: true, email: true } }, partner: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit
@@ -45,7 +45,7 @@ router.get('/', requireAuth, asyncHandler(async (req: Request, res: Response) =>
 }));
 
 router.post('/', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), asyncHandler(async (req: any, res: Response) => {
-  const { name, type, status, priority, clientId, partnerId, description } = req.body;
+  const { name, type, subType, status, priority, clientId, partnerId, description, contact } = req.body;
   
   const year = new Date().getFullYear();
   const count = await prisma.project.count();
@@ -53,18 +53,31 @@ router.post('/', requireAuth, requirePermission('projects'), validateRequest(Pro
   const reference = `PRJ-${year}-${seq}`;
 
   const project = await prisma.project.create({
-    data: { name, type, status, priority, clientId, partnerId, description, reference }
+    data: { name, type, subType, status, priority, clientId, partnerId, description, contact, reference }
   });
   await logAction(req.user!.sub, 'CREATE', 'PROJECT', project.id, `Création du projet ${project.name} (${reference})`);
   res.status(201).json(project);
 }));
 
-router.put('/:id', requireAuth, requirePermission('projects'), validateRequest(ProjectSchema), asyncHandler(async (req: any, res: Response) => {
+router.put('/:id', requireAuth, requirePermission('projects'), validateRequest(ProjectUpdateSchema), asyncHandler(async (req: any, res: Response) => {
   const { id } = req.params;
-  const { name, type, status, priority, clientId, partnerId, description } = req.body;
+  const { name, type, subType, status, priority, clientId, partnerId, description, contact } = req.body;
+  
+  // Build update data with only provided fields
+  const updateData: any = {};
+  if (name !== undefined) updateData.name = name;
+  if (type !== undefined) updateData.type = type;
+  if (subType !== undefined) updateData.subType = subType;
+  if (contact !== undefined) updateData.contact = contact;
+  if (status !== undefined) updateData.status = status;
+  if (priority !== undefined) updateData.priority = priority;
+  if (clientId !== undefined) updateData.clientId = clientId;
+  if (partnerId !== undefined) updateData.partnerId = partnerId;
+  if (description !== undefined) updateData.description = description;
+
   const project = await prisma.project.update({
     where: { id },
-    data: { name, type, status, priority, clientId, partnerId, description }
+    data: updateData
   });
   await logAction(req.user!.sub, 'UPDATE', 'PROJECT', project.id, `Mise à jour du projet ${project.name}`);
   res.json(project);

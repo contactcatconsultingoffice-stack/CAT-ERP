@@ -29,6 +29,7 @@ type Project = {
   clientId: string;
   partnerId: string | null;
   description?: string | null;
+  contact?: string | null;
   createdAt: string;
   client?: { name: string; contact?: string; email?: string };
   partner?: { name: string };
@@ -110,6 +111,7 @@ export function ProjectsPage() {
   const [priority, setPriority] = useState<Priority>('MEDIUM');
   const [clientId, setClientId] = useState('');
   const [partnerId, setPartnerId] = useState('');
+  const [contact, setContact] = useState('');
   const [description, setDescription] = useState('');
 
   // Update subType when type changes
@@ -139,21 +141,51 @@ export function ProjectsPage() {
     void load();
   }, []);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+
+  const openEditModal = (p: Project) => {
+    setIsEditing(true);
+    setEditId(p.id);
+    setName(p.name);
+    setType(p.type);
+    setSubType(p.subType || '');
+    setStatus(p.status);
+    setPriority(p.priority);
+    setClientId(p.clientId);
+    setPartnerId(p.partnerId || '');
+    setContact(p.contact || '');
+    setDescription(p.description || '');
+    setShowAddModal(true);
+  };
+
+  const resetForm = () => {
+    setIsEditing(false);
+    setEditId(null);
+    setName('');
+    setDescription('');
+    setClientId('');
+    setPartnerId('');
+    setContact('');
+    setShowAddModal(false);
+  };
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !clientId) return;
     setIsSubmitting(true);
     try {
-      await api.post('/projects', { name, type, subType, status, priority, clientId, partnerId: partnerId || null, description });
-      showToast('Projet créé avec succès !', 'success');
-      setName('');
-      setDescription('');
-      setClientId('');
-      setPartnerId('');
-      setShowAddModal(false);
+      if (isEditing && editId) {
+        await api.put(`/projects/${editId}`, { name, type, subType, status, priority, clientId, partnerId: partnerId || null, description, contact });
+        showToast('Projet mis à jour !', 'success');
+      } else {
+        await api.post('/projects', { name, type, subType, status, priority, clientId, partnerId: partnerId || null, description, contact });
+        showToast('Projet créé avec succès !', 'success');
+      }
+      resetForm();
       void load();
     } catch (err) {
-      showToast('Erreur lors de la création du projet.', 'error');
+      showToast('Erreur lors de l’opération.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -246,7 +278,7 @@ export function ProjectsPage() {
         <div className="search-box">
           <input 
             type="text" 
-            placeholder="Réf, nom, client..." 
+            placeholder="Rechercher par référence, projet, client..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -266,8 +298,8 @@ export function ProjectsPage() {
             filename="projets"
           />
           {role === 'ADMIN' && (
-            <button className="btn-primary" onClick={() => setShowAddModal(!showAddModal)}>
-              <Plus size={18} /> {showAddModal ? 'Fermer' : 'Nouveau Projet'}
+            <button className="btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }}>
+              <Plus size={18} /> Nouveau Projet
             </button>
           )}
         </div>
@@ -275,7 +307,7 @@ export function ProjectsPage() {
 
       {showAddModal && (
         <section className="card glass-card" style={{ marginBottom: '2rem' }}>
-          <h2>Créer un nouveau projet</h2>
+          <h2>{isEditing ? 'Modifier le projet' : 'Créer un nouveau projet'}</h2>
           <form onSubmit={handleAdd} className="form-grid">
             <label>
               Nom du projet *
@@ -323,9 +355,13 @@ export function ProjectsPage() {
               Statut initial
               <select value={status} onChange={e => setStatus(e.target.value as ProjectStatus)}>
                 {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
+                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
+            </label>
+            <label>
+              Contact (interlocuteur)
+              <input value={contact} onChange={e => setContact(e.target.value)} placeholder="Nom du contact" />
             </label>
             <label style={{ gridColumn: '1 / -1' }}>
               Description détaillée
@@ -334,9 +370,9 @@ export function ProjectsPage() {
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {isSubmitting && <Plus size={18} className="animate-spin" />}
-                {isSubmitting ? 'Création...' : 'Générer le projet (Réf auto)'}
+                {isSubmitting ? 'Traitement...' : isEditing ? 'Sauvegarder les modifications' : 'Générer le projet (Réf auto)'}
               </button>
-              <button type="button" className="ghost" onClick={() => setShowAddModal(false)} disabled={isSubmitting}>Annuler</button>
+              <button type="button" className="ghost" onClick={resetForm} disabled={isSubmitting}>Annuler</button>
             </div>
           </form>
         </section>
@@ -420,9 +456,14 @@ export function ProjectsPage() {
                         ))}
                       </select>
                       {role === 'ADMIN' && (
-                        <button className="ghost delete-btn" onClick={(e) => handleDelete(project.id, e)} style={{ padding: '0.2rem' }}>
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                          <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(project); }} style={{ padding: '0.2rem' }} title="Modifier">
+                            <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                          </button>
+                          <button className="ghost delete-btn" onClick={(e) => handleDelete(project.id, e)} style={{ padding: '0.2rem' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -505,8 +546,8 @@ export function ProjectsPage() {
               </div>
               
               <div>
-                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Interlocuteur</p>
-                <div style={{ color: 'var(--text-primary)' }}>{selectedProject.client?.contact || 'N/A'}</div>
+                <p style={{ margin: '0 0 0.3rem', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact</p>
+                <div style={{ color: 'var(--text-primary)' }}>{selectedProject.contact || selectedProject.client?.contact || 'N/A'}</div>
               </div>
 
               <div>

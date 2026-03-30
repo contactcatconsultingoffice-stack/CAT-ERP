@@ -158,7 +158,7 @@ export function CollaboratorsPage() {
             />
             <input
               type="text"
-              placeholder="Rechercher..."
+              placeholder="Rechercher par nom, spécialité..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ padding: '0.5rem 0.75rem', borderRadius: '0.75rem', width: '240px', maxWidth: '100%' }}

@@ -109,7 +109,6 @@ export function DashboardPage() {
     })).filter(d => d.value > 0);
   };
 
-  const revenueData = processRevenueData();
   const statusData = processStatusData();
 
   const containerVariants = {
@@ -172,28 +171,6 @@ export function DashboardPage() {
         
         {!isLoading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '2rem', marginTop: '2rem' }}>
-            <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Revenus ($ USD) par Mois</h3>
-              
-              {revenueData.length === 0 ? (
-                <div style={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                  Aucune facture payée.
-                </div>
-              ) : (
-                <div style={{ height: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" />
-                      <XAxis dataKey="name" tick={{fill: 'var(--text-secondary)', fontSize: 12}} axisLine={false} tickLine={false} />
-                      <YAxis tick={{fill: 'var(--text-secondary)', fontSize: 12}} axisLine={false} tickLine={false} width={80} tickFormatter={(val) => `$${val}`} />
-                      <Tooltip cursor={{fill: 'var(--bg-main)'}} formatter={(value: any) => [`$${Number(value || 0).toFixed(0)}`, 'Revenu encaissé']} contentStyle={{background: 'var(--bg-sidebar)', borderRadius: '0.5rem', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-main)', color: 'var(--text-primary)'}} itemStyle={{color: 'var(--text-primary)'}} />
-                      <Bar dataKey="total" fill="var(--accent-primary)" radius={[4, 4, 0, 0]} barSize={40} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </motion.div>
-            
             <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginBottom: '1.5rem', color: 'var(--text-primary)', fontWeight: 600 }}>Statistiques Globales</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

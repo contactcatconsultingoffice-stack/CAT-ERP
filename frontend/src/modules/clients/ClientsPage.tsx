@@ -144,7 +144,7 @@ export function ClientsPage() {
               data={clientsList.map(c => ({ 
                 ID: c.id, 
                 Entreprise: c.name, 
-                Interlocuteur: c.contact || '', 
+                Contact: c.contact || '', 
                 Email: c.email || '',
                 Téléphone: c.phone || ''
               }))} 
@@ -153,7 +153,7 @@ export function ClientsPage() {
             <div className="search-box">
               <input 
                 type="text" 
-                placeholder="Rechercher un client..." 
+                placeholder="Rechercher par nom, contact..." 
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -165,7 +165,7 @@ export function ClientsPage() {
             <thead>
               <tr>
                 <th>Nom de l'entreprise</th>
-                <th>Interlocuteur</th>
+                <th>Contact</th>
                 <th>Email</th>
                 <th>Téléphone</th>
                 {role === 'ADMIN' && <th style={{ width: 100 }}>Actions</th>}
@@ -229,7 +229,7 @@ export function ClientsPage() {
                             <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Interlocuteur
+                            Contact
                             <input value={editContact} onChange={e => setEditContact(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -300,7 +300,7 @@ export function ClientsPage() {
               />
             </label>
             <label>
-              Interlocuteur
+              Contact
               <input
                 value={contact}
                 onChange={e => setContact(e.target.value)}

@@ -82,11 +82,12 @@ export function UsersPage() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [newRole, setNewRole] = useState<'ADMIN' | 'COLLABORATOR'>('COLLABORATOR');
+  const [gender, setGender] = useState('');
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/users', { email, name, password, role: newRole });
+      await api.post('/users', { email, name, password, role: newRole, gender });
       setShowAddModal(false);
       setEmail('');
       setName('');
@@ -173,6 +174,14 @@ export function UsersPage() {
               <select value={newRole} onChange={e => setNewRole(e.target.value as any)}>
                 <option value="COLLABORATOR">Collaborateur (Gestion de dossiers)</option>
                 <option value="ADMIN">Associé (Accès complet)</option>
+              </select>
+            </label>
+            <label>
+              Genre
+              <select value={gender} onChange={e => setGender(e.target.value)}>
+                <option value="">Sélectionner...</option>
+                <option value="Homme">Homme</option>
+                <option value="Femme">Femme</option>
               </select>
             </label>
             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -276,7 +285,7 @@ export function UsersPage() {
           <div className="search-box">
             <input 
               type="text" 
-              placeholder="Rechercher un utilisateur..." 
+              placeholder="Rechercher par nom, email..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ padding: '0.4rem', borderRadius: '4px', border: '1px solid #ddd', width: '250px' }}

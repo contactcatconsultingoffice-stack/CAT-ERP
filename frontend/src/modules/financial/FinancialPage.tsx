@@ -49,7 +49,8 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 export function FinancialPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const { role, permissions } = user || { role: null, permissions: [] };
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -201,20 +202,33 @@ export function FinancialPage() {
           <h1>Factures & Devis</h1>
           <p>Générez et suivez les documents financiers liés aux projets.</p>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="search-box">
             <input 
               type="text" 
-              placeholder="Rechercher par Réf ou Projet..." 
+              placeholder="Rechercher par référence, projet..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
-              style={{ padding: '0.6rem', width: '250px', borderRadius: '0.75rem' }}
+              style={{ padding: '0.6rem', width: '280px', borderRadius: '0.75rem' }}
             />
           </div>
           {role === 'ADMIN' && (
-            <button className="btn-primary" onClick={() => setShowAdd(!showAdd)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: 'fit-content' }}>
-              <Plus size={18} /> {showAdd ? 'Fermer' : 'Créer Devis/Facture'}
-            </button>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button 
+                className="btn-primary" 
+                onClick={() => { setKind('QUOTE'); setShowAdd(true); }} 
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--accent-primary)', borderColor: 'var(--accent-primary)' }}
+              >
+                <Plus size={18} /> Nouveau Devis
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={() => { setKind('INVOICE'); setShowAdd(true); }} 
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={18} /> Nouvelle Facture
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -246,8 +260,13 @@ export function FinancialPage() {
       </div>
 
       {showAdd && role === 'ADMIN' && (
-        <section className="card glass-card" style={{ marginBottom: '1.5rem' }}>
-          <h2>Générateur de Document</h2>
+        <section className="card glass-card" style={{ marginBottom: '2.5rem', border: '1px solid var(--accent-primary)', position: 'relative', boxShadow: '0 0 20px rgba(99, 102, 241, 0.15)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ margin: 0 }}>Générer un {kind === 'QUOTE' ? 'Devis' : 'Facture'}</h2>
+            <button className="ghost" onClick={() => setShowAdd(false)} style={{ color: 'var(--text-muted)' }}>
+              <X size={20} />
+            </button>
+          </div>
           <form onSubmit={handleCreate}>
             <div className="form-grid" style={{ marginBottom: '1.5rem' }}>
               <label>

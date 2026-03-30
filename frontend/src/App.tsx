@@ -7,6 +7,7 @@ import { DashboardPage } from './modules/dashboard/DashboardPage';
 import { ClientsPage } from './modules/clients/ClientsPage';
 import { ProjectsPage } from './modules/projects/ProjectsPage';
 import { FinancialPage } from './modules/financial/FinancialPage';
+import { FinancesPage } from './modules/finances/FinancesPage';
 import { MissionsPage } from './modules/missions/MissionsPage';
 import { CollaboratorsPage } from './modules/collaborators/CollaboratorsPage';
 import { PartnersPage } from './modules/partners/PartnersPage';
@@ -41,7 +42,9 @@ import {
   ExternalLink,
   Sun,
   Moon,
-  CalendarDays
+  CalendarDays,
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
 
@@ -245,7 +248,7 @@ export function App() {
               </div>
               <input 
                 type="text" 
-                placeholder="Recherche globale..." 
+                placeholder="Rechercher par référence, projet, client..." 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 onFocus={() => searchTerm.trim().length > 1 && setShowResults(true)}
@@ -324,25 +327,28 @@ export function App() {
           {(role === 'ADMIN' || permissions.includes('contacts')) && <NavLink to="/contacts" className="nav-link"><User size={20} /><span>Contacts</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/financial" className="nav-link"><PieChart size={20} /><span>Factures & Devis</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/invoices" className="nav-link"><FileText size={20} /><span>Générateur PDF</span></NavLink>}
-          {(role === 'ADMIN' || permissions.includes('contracts')) && <NavLink to="/contracts" className="nav-link"><Briefcase size={20} /><span>Contrats</span></NavLink>}
+          {(role === 'ADMIN' || permissions.includes('finances')) && <NavLink to="/finances" className="nav-link"><Wallet size={20} /><span>Finances</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('missions')) && <NavLink to="/missions" className="nav-link"><Clock size={20} /><span>Missions</span></NavLink>}
           {role === 'ADMIN' && <NavLink to="/users" className="nav-link"><Users size={20} /><span>Utilisateurs</span></NavLink>}
           {isSuperAdmin && <NavLink to="/admin/logs" className="nav-link"><Activity size={20} /><span>Journal d'Activité</span></NavLink>}
         </nav>
         
         {role && (
-          <div className="sidebar-footer" style={{ marginTop: 'auto', fontSize: '0.8rem', padding: '1rem 0', borderTop: '1px solid var(--border-color-soft)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', padding: '0 0.5rem' }}>
-              {isSidebarOpen && <div className="sidebar-footer-text" style={{ color: 'var(--text-secondary)' }}>Thème <strong>{theme === 'light' ? 'Clair' : 'Sombre'}</strong></div>}
-              <button type="button" className="ghost" onClick={toggleTheme} style={{ padding: '0.4rem', border: 'none' }} title="Changer le thème">
-                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
-              </button>
+          <div className="sidebar-footer">
+            <button className="theme-toggle" onClick={toggleTheme}>
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <div className="user-profile-summary" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)', border: '1px solid var(--border-color)', width: '100%' }}>
+              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name || 'Utilisateur'}</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</span>
+              </div>
             </div>
-            <div className="sidebar-footer-text" style={{ marginBottom: '0.4rem', color: 'var(--text-secondary)', padding: '0 0.5rem' }}>
-              {isSidebarOpen && <>Connecté en tant que <strong style={{color: 'var(--text-primary)'}}>{isSuperAdmin ? 'Super Admin' : role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</strong></>}
-            </div>
-            <button type="button" className="ghost btn-logout" onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}>
-              <LogOut size={16} /> <span className="logout-text">Déconnexion</span>
+            <button className="logout-btn" onClick={logout} style={{ marginLeft: 'auto' }}>
+              <LogOut size={20} />
             </button>
           </div>
         )}
@@ -367,7 +373,7 @@ export function App() {
             <Route path="/contacts" element={<P req="contacts"><ContactsPage /></P>} />
             <Route path="/financial" element={<P req="financial"><FinancialPage /></P>} />
             <Route path="/invoices" element={<P req="financial"><InvoicePage /></P>} />
-            <Route path="/contracts" element={<P req="contracts"><ContractsPage /></P>} />
+            <Route path="/finances" element={<P req="finances"><FinancesPage /></P>} />
             <Route path="/missions" element={<P req="missions"><MissionsPage /></P>} />
             
             {/* ADMIN ONLY ROUTES */}

@@ -125,7 +125,7 @@ export function MissionsPage() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <input 
               type="text" 
-              placeholder="Rechercher..." 
+              placeholder="Rechercher par collaborateur, projet..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd', width: '200px' }}

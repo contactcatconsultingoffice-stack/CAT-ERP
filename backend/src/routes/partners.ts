@@ -36,9 +36,9 @@ router.get('/', requireAuth, requirePermission('partners'), asyncHandler(async (
 }));
 
 router.post('/', requireAuth, requirePermission('partners'), validateRequest(PartnerSchema), asyncHandler(async (req: any, res) => {
-  const { name, contact, email, phone } = req.body;
+  const { name, contact, email, phone, links } = req.body;
   const partner = await prisma.partner.create({
-    data: { name, contact, email, phone }
+    data: { name, contact, email, phone, links }
   });
   await logAction(req.user!.sub, 'CREATE', 'PARTNER', partner.id, `Création du partenaire ${partner.name}`);
   res.status(201).json(partner);
@@ -46,10 +46,10 @@ router.post('/', requireAuth, requirePermission('partners'), validateRequest(Par
 
 router.put('/:id', requireAuth, requirePermission('partners'), asyncHandler(async (req: any, res) => {
   const { id } = req.params;
-  const { name, contact, email, phone } = req.body;
+  const { name, contact, email, phone, links } = req.body;
   const partner = await prisma.partner.update({
     where: { id },
-    data: { name, contact, email, phone }
+    data: { name, contact, email, phone, links }
   });
   await logAction(req.user!.sub, 'UPDATE', 'PARTNER', partner.id, `Mise à jour du partenaire ${partner.name}`);
   res.json(partner);

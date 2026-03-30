@@ -31,7 +31,8 @@ type PaginatedContracts = {
 };
 
 export function ContractsPage() {
-  const { role } = useAuth();
+  const { user } = useAuth();
+  const { role, permissions } = user || { role: null, permissions: [] };
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
@@ -109,7 +110,7 @@ export function ContractsPage() {
           <div className="search-box">
             <input 
               type="text" 
-              placeholder="Rechercher un contrat..." 
+              placeholder="Rechercher par référence, client..." 
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #ddd', width: '300px', maxWidth: '100%' }}

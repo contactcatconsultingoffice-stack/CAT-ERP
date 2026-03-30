@@ -33,6 +33,7 @@ router.get('/', requireAuth, requireAdmin, asyncHandler(async (req: Request, res
         id: true,
         email: true,
         name: true,
+        gender: true,
         role: true,
         isSuperAdmin: true,
         createdAt: true,
@@ -48,13 +49,13 @@ router.get('/', requireAuth, requireAdmin, asyncHandler(async (req: Request, res
 }));
 
 router.post('/', requireAuth, requireSuperAdmin, validateRequest(UserSchema), asyncHandler(async (req: Request, res: Response) => {
-  const { email, name, password, role } = req.body;
+  const { email, name, password, role, gender } = req.body;
   if (!email || !password || !role) {
     return res.status(400).json({ error: 'Email, mot de passe et rôle requis.' });
   }
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await prisma.user.create({
-    data: { email, name, passwordHash, role }
+    data: { email, name, passwordHash, role, gender }
   });
   
   // Send welcome email asynchronously

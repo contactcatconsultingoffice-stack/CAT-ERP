@@ -11,6 +11,7 @@ model User {
   id                String   @id @default(cuid())
   email             String   @unique
   name              String?
+  gender            String?  // "Homme" | "Femme"
   passwordHash      String?
   resetToken        String?
   resetTokenExpires DateTime?
@@ -54,6 +55,7 @@ model Partner {
   contact   String?
   email     String?
   phone     String?
+  links     String?  // External links (LinkedIn, website, etc.)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -78,6 +80,7 @@ model Project {
   name        String
   type        ProjectType
   subType     String?
+  contact     String?       // Contact person for this project
   status      ProjectStatus @default(PLANNING)
   priority    Priority      @default(MEDIUM)
   client      Client        @relation(fields: [clientId], references: [id])

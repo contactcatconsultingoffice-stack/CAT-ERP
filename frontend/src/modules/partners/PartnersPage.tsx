@@ -13,6 +13,7 @@ type Partner = {
   contact?: string | null;
   email?: string | null;
   phone?: string | null;
+  links?: string | null;
 };
 
 type PaginatedPartners = {
@@ -38,6 +39,7 @@ export function PartnersPage() {
   const [contact, setContact] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [links, setLinks] = useState('');
 
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,6 +47,7 @@ export function PartnersPage() {
   const [editContact, setEditContact] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editLinks, setEditLinks] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -75,9 +78,9 @@ export function PartnersPage() {
     if (!name) return;
     setIsAdding(true);
     try {
-      await api.post<Partner>('/partners', { name, contact, email, phone });
+      await api.post<Partner>('/partners', { name, contact, email, phone, links });
       showToast('Partenaire ajouté !', 'success');
-      setName(''); setContact(''); setEmail(''); setPhone('');
+      setName(''); setContact(''); setEmail(''); setPhone(''); setLinks('');
       reloadData();
     } catch {
       showToast('Erreur lors de l\'ajout du partenaire.', 'error');
@@ -92,6 +95,7 @@ export function PartnersPage() {
     setEditContact(p.contact || '');
     setEditEmail(p.email || '');
     setEditPhone(p.phone || '');
+    setEditLinks(p.links || '');
   };
 
   const cancelEdit = () => setEditingId(null);
@@ -99,7 +103,7 @@ export function PartnersPage() {
   const handleSaveEdit = async (id: string) => {
     setIsUpdating(true);
     try {
-      await api.put(`/partners/${id}`, { name: editName, contact: editContact, email: editEmail, phone: editPhone });
+      await api.put(`/partners/${id}`, { name: editName, contact: editContact, email: editEmail, phone: editPhone, links: editLinks });
       showToast('Partenaire mis à jour !', 'success');
       setEditingId(null);
       reloadData();
@@ -136,16 +140,17 @@ export function PartnersPage() {
               data={partnersList.map(p => ({ 
                 ID: p.id, 
                 Entreprise: p.name, 
-                Interlocuteur: p.contact || '', 
+                Contact: p.contact || '', 
                 Email: p.email || '',
-                Téléphone: p.phone || '' 
+                Téléphone: p.phone || '',
+                Liens: p.links || '' 
               }))}
               filename="partenaires"
             />
             <div className="search-box">
               <input
                 type="text"
-                placeholder="Rechercher un partenaire..."
+                placeholder="Rechercher par nom, domaine..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -157,9 +162,10 @@ export function PartnersPage() {
             <thead>
               <tr>
                 <th>Nom de l'entreprise</th>
-                <th>Interlocuteur</th>
+                <th>Contact</th>
                 <th>Email</th>
                 <th>Téléphone</th>
+                <th>Liens</th>
                 {role === 'ADMIN' && <th style={{ width: 100 }}>Actions</th>}
               </tr>
             </thead>
@@ -183,6 +189,7 @@ export function PartnersPage() {
                     <td>{p.contact || '—'}</td>
                     <td>{p.email || '—'}</td>
                     <td>{p.phone || '—'}</td>
+                    <td>{p.links ? <a href={p.links} target="_blank" rel="noopener noreferrer" className="link-hover" style={{ color: 'var(--accent-primary)' }}>Voir lien</a> : '—'}</td>
                     {role === 'ADMIN' && (
                       <td>
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -227,7 +234,7 @@ export function PartnersPage() {
                             <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Interlocuteur
+                            Contact
                             <input value={editContact} onChange={e => setEditContact(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -237,6 +244,10 @@ export function PartnersPage() {
                           <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                             Téléphone
                             <input value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ padding: '0.5rem' }} />
+                          </label>
+                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            Liens
+                            <input value={editLinks} onChange={e => setEditLinks(e.target.value)} style={{ padding: '0.5rem' }} />
                           </label>
                           <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.1rem' }}>
                             <button type="button" className="btn-primary" onClick={() => handleSaveEdit(p.id)} disabled={isUpdating} style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -290,9 +301,10 @@ export function PartnersPage() {
           <h2>Ajouter un partenaire</h2>
           <form onSubmit={handleAdd} className="form-grid">
             <label>Nom de l'entreprise <input value={name} onChange={e => setName(e.target.value)} required /></label>
-            <label>Interlocuteur <input value={contact} onChange={e => setContact(e.target.value)} /></label>
+            <label>Contact <input value={contact} onChange={e => setContact(e.target.value)} /></label>
             <label>Email <input value={email} type="email" onChange={e => setEmail(e.target.value)} /></label>
             <label>Téléphone <input value={phone} onChange={e => setPhone(e.target.value)} /></label>
+            <label>Liens <input value={links} onChange={e => setLinks(e.target.value)} placeholder="Ex: https://linkedin.com/..." /></label>
             <div>
               <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {isAdding && <Loader2 size={16} className="animate-spin" />}
