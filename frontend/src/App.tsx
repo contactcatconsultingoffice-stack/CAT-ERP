@@ -335,19 +335,19 @@ export function App() {
         
         {role && (
           <div className="sidebar-footer">
-            <button className="theme-toggle" onClick={toggleTheme}>
+            <button className="sidebar-footer-btn theme-toggle" onClick={toggleTheme} title="Changer le thème">
               {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-            <div className="user-profile-summary" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)', border: '1px solid var(--border-color)', width: '100%' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+            <div className="user-profile-card">
+              <div className="avatar">
                 {user?.name?.charAt(0) || 'U'}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name || 'Utilisateur'}</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user?.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</span>
+              <div className="user-info">
+                <span className="user-name">{user?.name || 'Utilisateur'}</span>
+                <span className="user-role">{user?.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</span>
               </div>
             </div>
-            <button className="logout-btn" onClick={logout} style={{ marginLeft: 'auto' }}>
+            <button className="sidebar-footer-btn logout-btn" onClick={logout} title="Déconnexion">
               <LogOut size={20} />
             </button>
           </div>
