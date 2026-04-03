@@ -72,7 +72,7 @@ export function App() {
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   // Global Search State
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -97,7 +97,7 @@ export function App() {
         try {
           const limit = 5;
           const searchParam = encodeURIComponent(searchTerm.trim());
-          
+
           // Use Promise.allSettled with pagination params
           const results = await Promise.allSettled([
             api.get<any>(`/clients?limit=${limit}&search=${searchParam}`),
@@ -108,21 +108,21 @@ export function App() {
           const [clientsRes, projectsRes, prospectsRes] = results;
 
           const combined: SearchResult[] = [];
-          
+
           if (clientsRes.status === 'fulfilled' && clientsRes.value.data) {
-            clientsRes.value.data.forEach((c: any) => 
+            clientsRes.value.data.forEach((c: any) =>
               combined.push({ id: c.id, type: 'client', name: c.name, subtext: 'Client' })
             );
           }
 
           if (projectsRes.status === 'fulfilled' && projectsRes.value.data) {
-            projectsRes.value.data.forEach((p: any) => 
-               combined.push({ id: p.id, type: 'project', name: p.name, subtext: `Projet - ${p.reference || ''}` })
+            projectsRes.value.data.forEach((p: any) =>
+              combined.push({ id: p.id, type: 'project', name: p.name, subtext: `Projet - ${p.reference || ''}` })
             );
           }
 
           if (prospectsRes.status === 'fulfilled' && prospectsRes.value.data) {
-            prospectsRes.value.data.forEach((pr: any) => 
+            prospectsRes.value.data.forEach((pr: any) =>
               combined.push({ id: pr.id, type: 'contact', name: pr.name, subtext: 'Contact' })
             );
           }
@@ -177,67 +177,67 @@ export function App() {
   return (
     <div className={`app-shell ${isSidebarOpen ? '' : 'sidebar-closed'}`}>
       <header className="mobile-header">
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
-    opacity: isMobileMenuOpen ? 0 : 1,
-    pointerEvents: isMobileMenuOpen ? 'none' : 'auto',
-    transition: 'opacity 0.2s ease',
-    minWidth: 0,
-  }}>
-    <img src="/logo.png" alt="CAT ERP" style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
-    <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>CAT ERP</span>
-  </div>
-  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', alignItems: 'center', flexShrink: 0 }}>
-    {!isMobileMenuOpen && (
-      <button className="ghost" onClick={toggleTheme} style={{ padding: '0.5rem' }} title="Changer le thème">
-        {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-      </button>
-    )}
-    <button className="ghost" onClick={toggleMobileMenu} style={{ padding: '0.5rem' }}>
-      {isMobileMenuOpen ? <CloseIcon size={24} /> : <Menu size={24} />}
-    </button>
-  </div>
-</header>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          opacity: isMobileMenuOpen ? 0 : 1,
+          pointerEvents: isMobileMenuOpen ? 'none' : 'auto',
+          transition: 'opacity 0.2s ease',
+          minWidth: 0,
+        }}>
+          <img src="/logo.png" alt="CAT ERP" style={{ width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
+          <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>CAT ERP</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto', alignItems: 'center', flexShrink: 0 }}>
+          {!isMobileMenuOpen && (
+            <button className="ghost" onClick={toggleTheme} style={{ padding: '0.5rem' }} title="Changer le thème">
+              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
+          )}
+          <button className="ghost" onClick={toggleMobileMenu} style={{ padding: '0.5rem' }}>
+            {isMobileMenuOpen ? <CloseIcon size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+      </header>
 
       {isMobileMenuOpen && <div className="mobile-backdrop" onClick={closeMobileMenu} />}
 
       <aside className={`sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-        <div style={{ 
-          display: 'flex', 
+        <div style={{
+          display: 'flex',
           flexDirection: isSidebarOpen ? 'row' : 'column',
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
-          marginBottom: '1.5rem', 
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '1.5rem',
           padding: isSidebarOpen ? '0 0.5rem' : '0',
           gap: isSidebarOpen ? '0' : '1rem'
         }}>
           <div className="brand" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: isSidebarOpen ? 'auto' : '100%' }}>
-            <img 
-              src="/logo.png" 
-              alt="CAT ERP" 
-              style={{ 
-                width: isSidebarOpen ? '96px' : '44px', 
-                height: isSidebarOpen ? '96px' : '44px', 
+            <img
+              src="/logo.png"
+              alt="CAT ERP"
+              style={{
+                width: isSidebarOpen ? '96px' : '44px',
+                height: isSidebarOpen ? '96px' : '44px',
                 borderRadius: '50%',
                 objectFit: 'cover',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 border: '3px solid rgba(255,255,255,0.15)',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-              }} 
+              }}
             />
           </div>
-          <button 
-            type="button" 
-            className="ghost sidebar-toggle-desktop" 
+          <button
+            type="button"
+            className="ghost sidebar-toggle-desktop"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             style={{ padding: '0.4rem', color: '#94a3b8', marginTop: isSidebarOpen ? '0' : '0.5rem' }}
             title="Toggle Sidebar"
           >
             {isSidebarOpen ? <ChevronLeft size={20} /> : <Menu size={20} />}
           </button>
-          
+
         </div>
 
         {isSidebarOpen && (
@@ -246,25 +246,25 @@ export function App() {
               <div style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
                 <Search size={14} />
               </div>
-              <input 
-                type="text" 
-                placeholder="Rechercher par référence, projet, client..." 
+              <input
+                type="text"
+                placeholder="Rechercher par référence, projet, client..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 onFocus={() => searchTerm.trim().length > 1 && setShowResults(true)}
-                style={{ 
-                  width: '100%', 
-                  background: 'rgba(255,255,255,0.05)', 
-                  border: '1px solid rgba(255,255,255,0.1)', 
-                  padding: '0.6rem 0.75rem 0.6rem 2.25rem', 
-                  borderRadius: '0.5rem', 
-                  color: 'var(--text-primary)', 
+                style={{
+                  width: '100%',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '0.6rem 0.75rem 0.6rem 2.25rem',
+                  borderRadius: '0.5rem',
+                  color: 'var(--text-primary)',
                   fontSize: '0.85rem',
                   outline: 'none'
-                }} 
+                }}
               />
               {searchTerm && (
-                <button 
+                <button
                   onClick={() => setSearchTerm('')}
                   style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.2rem' }}
                 >
@@ -278,9 +278,9 @@ export function App() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    style={{ 
-                      position: 'absolute', top: '110%', left: 0, right: 0, 
-                      background: 'var(--bg-sidebar)', borderRadius: '1rem', 
+                    style={{
+                      position: 'absolute', top: '110%', left: 0, right: 0,
+                      background: 'var(--bg-sidebar)', borderRadius: '1rem',
                       boxShadow: 'var(--shadow-main)', border: '1px solid var(--border-color)',
                       zIndex: 100, overflow: 'hidden', backdropFilter: 'var(--glass-blur)'
                     }}
@@ -290,7 +290,7 @@ export function App() {
                     ) : searchResults.length > 0 ? (
                       <div>
                         {searchResults.map(res => (
-                          <div 
+                          <div
                             key={`${res.type}-${res.id}`}
                             onClick={() => handleResultClick(res)}
                             style={{ padding: '0.75rem 1rem', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}
@@ -332,28 +332,42 @@ export function App() {
           {role === 'ADMIN' && <NavLink to="/users" className="nav-link"><Users size={20} /><span>Utilisateurs</span></NavLink>}
           {isSuperAdmin && <NavLink to="/admin/logs" className="nav-link"><Activity size={20} /><span>Journal d'Activité</span></NavLink>}
         </nav>
-        
+
         {role && (
-          <div className="sidebar-footer">
-            <button className="sidebar-footer-btn theme-toggle" onClick={toggleTheme} title="Changer le thème">
-              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-            <div className="user-profile-card">
-              <div className="avatar">
-                {user?.name?.charAt(0) || 'U'}
+          <div className="sidebar-footer-v2">
+            <div className="sidebar-user-block">
+              <div className="sidebar-avatar-ring">
+                <div className="sidebar-avatar">
+                  {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
               </div>
-              <div className="user-info">
-                <span className="user-name">{user?.name || 'Utilisateur'}</span>
-                <span className="user-role">{user?.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}</span>
+              <div className="sidebar-user-info">
+                <span className="sidebar-user-name">{user?.name || 'Utilisateur'}</span>
+                <span className="sidebar-user-badge">
+                  {user?.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}
+                </span>
+              </div>
+              <div className="sidebar-user-actions">
+                <button
+                  className="sidebar-action-btn"
+                  onClick={toggleTheme}
+                  title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                >
+                  {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                </button>
+                <button
+                  className="sidebar-action-btn sidebar-action-btn--logout"
+                  onClick={logout}
+                  title="Déconnexion"
+                >
+                  <LogOut size={15} />
+                </button>
               </div>
             </div>
-            <button className="sidebar-footer-btn logout-btn" onClick={logout} title="Déconnexion">
-              <LogOut size={20} />
-            </button>
           </div>
         )}
       </aside>
-      
+
       <main className="main">
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
@@ -375,7 +389,7 @@ export function App() {
             <Route path="/invoices" element={<P req="financial"><InvoicePage /></P>} />
             <Route path="/finances" element={<P req="finances"><FinancesPage /></P>} />
             <Route path="/missions" element={<P req="missions"><MissionsPage /></P>} />
-            
+
             {/* ADMIN ONLY ROUTES */}
             <Route path="/users" element={
               <ProtectedRoute>

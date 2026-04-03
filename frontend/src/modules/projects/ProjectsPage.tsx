@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { 
-  Plus, 
-  Trash2, 
-  User, 
-  Briefcase, 
+import {
+  Plus,
+  Trash2,
+  User,
+  Briefcase,
   Layers,
   List,
   LayoutPanelTop,
@@ -103,7 +103,7 @@ export function ProjectsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'BOARD' | 'LIST'>('BOARD');
-  
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
@@ -281,10 +281,10 @@ export function ProjectsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div className="segmented" style={{ display: 'flex', background: 'var(--bg-input)', borderRadius: '12px', padding: '0.3rem', border: '1px solid var(--border-color)' }}>
-            <button 
-              className={`ghost ${viewMode === 'BOARD' ? 'active' : ''}`} 
+            <button
+              className={`ghost ${viewMode === 'BOARD' ? 'active' : ''}`}
               onClick={() => setViewMode('BOARD')}
-              style={{ 
+              style={{
                 display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '10px',
                 fontWeight: 600, fontSize: '0.9rem',
                 background: viewMode === 'BOARD' ? 'var(--accent-primary)' : 'transparent',
@@ -293,10 +293,10 @@ export function ProjectsPage() {
             >
               <LayoutPanelTop size={18} /> Kanban Board
             </button>
-            <button 
-              className={`ghost ${viewMode === 'LIST' ? 'active' : ''}`} 
+            <button
+              className={`ghost ${viewMode === 'LIST' ? 'active' : ''}`}
               onClick={() => setViewMode('LIST')}
-              style={{ 
+              style={{
                 display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.2rem', borderRadius: '10px',
                 fontWeight: 600, fontSize: '0.9rem',
                 background: viewMode === 'LIST' ? 'var(--accent-primary)' : 'transparent',
@@ -306,11 +306,11 @@ export function ProjectsPage() {
               <List size={18} /> Project List
             </button>
           </div>
-          
+
           <div className="search-box" style={{ width: '320px' }}>
-            <input 
-              type="text" 
-              placeholder="Search projects, clients or refs..." 
+            <input
+              type="text"
+              placeholder="Search projects, clients or refs..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ borderRadius: '12px' }}
@@ -319,7 +319,7 @@ export function ProjectsPage() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <ExportButtons 
+          <ExportButtons
             data={filtered.map(p => ({
               Référence: p.reference || 'N/A',
               Nom: p.name,
@@ -329,7 +329,7 @@ export function ProjectsPage() {
               Client: p.client?.name || 'Inconnu',
               Partenaire: p.partner?.name || 'Aucun',
               Créé_le: new Date(p.createdAt).toLocaleDateString('fr-FR')
-            }))} 
+            }))}
             filename="projets"
           />
           {role === 'ADMIN' && (
@@ -389,7 +389,7 @@ export function ProjectsPage() {
               Statut initial
               <select value={status} onChange={e => setStatus(e.target.value as ProjectStatus)}>
                 {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                   <option key={val} value={val}>{label}</option>
+                  <option key={val} value={val}>{label}</option>
                 ))}
               </select>
             </label>
@@ -412,80 +412,80 @@ export function ProjectsPage() {
         </section>
       )}
 
-        {viewMode === 'LIST' && (
-          <div className="card" style={{ padding: '1.25rem', marginBottom: '2rem', overflowX: 'auto' }}>
-            <table className="table" style={{ minWidth: '840px' }}>
-              <thead>
-                <tr>
-                  <th>R?f</th>
-                  <th>Projet</th>
-                  <th>Client</th>
-                  <th>Statut</th>
-                  <th>Priorit?</th>
-                  <th>Type</th>
-                  <th>Cr??</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(p => (
-                  <tr key={p.id} onClick={() => setSelectedProject(p)} style={{ cursor: 'pointer' }}>
-                    <td style={{ color: 'var(--text-accent)', fontWeight: 600 }}>{p.reference || 'PRJ-N/A'}</td>
-                    <td>{p.name}</td>
-                    <td>{p.client?.name || 'Client inconnu'}</td>
-                    <td>
-                      <select 
-                        value={p.status}
-                        onClick={e => e.stopPropagation()}
-                        onChange={e => handleStatusChange(p.id, e.target.value as ProjectStatus)}
-                        className={"status status-" + p.status.toLowerCase()}
-                        style={{ fontSize: '0.8rem' }}
-                      >
-                        {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        value={p.priority}
-                        onClick={e => e.stopPropagation()}
-                        onChange={e => handlePriorityChange(p.id, e.target.value as Priority)}
-                        style={{ fontSize: '0.8rem', color: PRIORITY_COLORS[p.priority], background: 'var(--bg-input)' }}
-                      >
-                        {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
-                          <option key={val} value={val}>{label}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>{TYPE_LABELS[p.type]}</td>
-                    <td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td>
-                    <td style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
-                      <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(p); setSelectedProject(null); }}>
-                        <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+      {viewMode === 'LIST' && (
+        <div className="card" style={{ padding: '1.25rem', marginBottom: '2rem', overflowX: 'auto' }}>
+          <table className="table" style={{ minWidth: '840px' }}>
+            <thead>
+              <tr>
+                <th>R?f</th>
+                <th>Projet</th>
+                <th>Client</th>
+                <th>Statut</th>
+                <th>Priorit?</th>
+                <th>Type</th>
+                <th>Cr??</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p => (
+                <tr key={p.id} onClick={() => setSelectedProject(p)} style={{ cursor: 'pointer' }}>
+                  <td style={{ color: 'var(--text-accent)', fontWeight: 600 }}>{p.reference || 'PRJ-N/A'}</td>
+                  <td>{p.name}</td>
+                  <td>{p.client?.name || 'Client inconnu'}</td>
+                  <td>
+                    <select
+                      value={p.status}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => handleStatusChange(p.id, e.target.value as ProjectStatus)}
+                      className={"status status-" + p.status.toLowerCase()}
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      value={p.priority}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => handlePriorityChange(p.id, e.target.value as Priority)}
+                      style={{ fontSize: '0.8rem', color: PRIORITY_COLORS[p.priority], background: 'var(--bg-input)' }}
+                    >
+                      {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{TYPE_LABELS[p.type]}</td>
+                  <td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                    <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(p); setSelectedProject(null); }}>
+                      <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                    </button>
+                    {role === 'ADMIN' && (
+                      <button className="ghost delete-btn" onClick={(e) => handleDelete(p.id, e)}>
+                        <Trash2 size={14} />
                       </button>
-                      {role === 'ADMIN' && (
-                        <button className="ghost delete-btn" onClick={(e) => handleDelete(p.id, e)}>
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {viewMode === 'BOARD' && (
+      {viewMode === 'BOARD' && (
         <div className="kanban-board">
           {columns.map(statusKey => {
             const columnProjects = filtered.filter(p => p.status === statusKey);
             const visibleProjects = columnProjects.slice(0, 3);
             const hiddenProjects = columnProjects.slice(3);
             return (
-              <div 
-                key={statusKey} 
+              <div
+                key={statusKey}
                 className="kanban-column"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, statusKey)}
@@ -494,11 +494,11 @@ export function ProjectsPage() {
                   <span className={"status status-" + statusKey.toLowerCase()}>{STATUS_LABELS[statusKey]}</span>
                   <span style={{ background: 'var(--bg-input)', padding: '0.1rem 0.6rem', borderRadius: '1rem', color: 'var(--text-primary)' }}>{columnProjects.length}</span>
                 </h3>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', minHeight: '150px' }}>
                   {visibleProjects.map(project => (
-                    <div 
-                      key={project.id} 
+                    <div
+                      key={project.id}
                       className="project-card"
                       draggable
                       onDragStart={(e) => handleDragStart(e, project.id)}
@@ -508,15 +508,15 @@ export function ProjectsPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-accent)', fontSize: '0.75rem', fontWeight: 600 }}>
                           <Hash size={12} /> {project.reference || 'PRJ-N/A'}
-                          <span style={{ 
-                            width: '8px', 
-                            height: '8px', 
-                            borderRadius: '50%', 
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
                             background: PRIORITY_COLORS[project.priority],
                             marginLeft: '4px'
                           }} title={`Priorit?: ${PRIORITY_LABELS[project.priority]}`} />
                         </div>
-                        <select 
+                        <select
                           value={project.status}
                           onChange={(e) => { e.stopPropagation(); handleStatusChange(project.id, e.target.value as ProjectStatus); }}
                           onClick={e => e.stopPropagation()}
@@ -530,7 +530,7 @@ export function ProjectsPage() {
                       </div>
 
                       <h4 style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', color: 'var(--text-primary)' }}>{project.name}</h4>
-                      
+
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
                         <User size={14} /> {project.client?.name || 'Client inconnu'}
                       </div>
@@ -545,7 +545,7 @@ export function ProjectsPage() {
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                           <Briefcase size={12} /> {project.type}
                         </span>
-                        <select 
+                        <select
                           value={project.priority}
                           onChange={(e) => { e.stopPropagation(); handlePriorityChange(project.id, e.target.value as Priority); }}
                           onClick={e => e.stopPropagation()}
@@ -575,17 +575,17 @@ export function ProjectsPage() {
                         Autres projets (+{hiddenProjects.length})
                       </p>
                       {hiddenProjects.map(project => (
-                        <div 
+                        <div
                           key={project.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, project.id)}
                           onDragEnd={handleDragEnd}
                           onClick={() => setSelectedProject(project)}
-                          style={{ 
-                            background: 'var(--bg-card)', 
-                            padding: '0.6rem 0.8rem', 
-                            borderRadius: 'var(--radius-sm)', 
-                            cursor: 'pointer', 
+                          style={{
+                            background: 'var(--bg-card)',
+                            padding: '0.6rem 0.8rem',
+                            borderRadius: 'var(--radius-sm)',
+                            cursor: 'pointer',
                             border: '1px solid var(--border-color)',
                             display: 'flex',
                             alignItems: 'center',
@@ -610,7 +610,7 @@ export function ProjectsPage() {
                       ))}
                     </div>
                   )}
-                  
+
                   {columnProjects.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
                       Glissez un projet ici
@@ -621,15 +621,43 @@ export function ProjectsPage() {
             );
           })}
         </div>
-        )}
+      )}
       {/* Project Details Modal */}
       {selectedProject && (
-        <div className="mobile-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '2rem 1rem', background: 'rgba(0,0,0,0.2)', overflowY: 'auto' }} onClick={() => setSelectedProject(null)}>
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }} 
-            animate={{ scale: 1, opacity: 1 }}
-            className="card" 
-            style={{ width: '100%', maxWidth: '1000px', padding: 0, minHeight: 'min-content', maxHeight: 'max-content', margin: 'auto', display: 'flex', flexDirection: 'column', borderRadius: '24px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden', background: 'var(--bg-main)' }} 
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(8, 13, 20, 0.72)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1.5rem',
+          }}
+          onClick={() => setSelectedProject(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.98 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '980px',
+              maxHeight: '88vh',
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: '20px',
+              border: '1px solid var(--border-color-active)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(79,111,255,0.08)',
+              overflow: 'hidden',
+              background: 'var(--bg-main)',
+            }}
             onClick={e => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -677,12 +705,12 @@ export function ProjectsPage() {
               </div>
 
               {/* Right Column: Metadata & Controls */}
-              <div style={{ padding: '2rem', background: 'var(--bg-main)', overflowY: 'auto' }}>
+              <div style={{ padding: '1.75rem', background: 'var(--bg-sidebar)', overflowY: 'auto' }}>
                 <div style={{ display: 'grid', gap: '1.5rem' }}>
                   <div>
                     <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.75rem', fontWeight: 600 }}>Statut & Priorité</h4>
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
-                      <select 
+                      <select
                         value={selectedProject.status}
                         onChange={(e) => handleStatusChange(selectedProject.id, e.target.value as ProjectStatus)}
                         style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', fontSize: '0.9rem' }}
@@ -691,7 +719,7 @@ export function ProjectsPage() {
                           <option key={val} value={val}>{label}</option>
                         ))}
                       </select>
-                      <select 
+                      <select
                         value={selectedProject.priority}
                         onChange={(e) => handlePriorityChange(selectedProject.id, e.target.value as Priority)}
                         style={{ width: '100%', padding: '0.6rem', borderRadius: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', color: PRIORITY_COLORS[selectedProject.priority], fontWeight: 600, fontSize: '0.9rem' }}
