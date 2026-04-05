@@ -221,7 +221,7 @@ export function ProjectsPage() {
         showToast('Projet créé avec succès !', 'success');
       }
       resetForm();
-      void load();
+      void load(true);
     } catch (err) {
       showToast('Erreur lors de l’opération.', 'error');
     } finally {
@@ -236,7 +236,7 @@ export function ProjectsPage() {
       await api.delete(`/projects/${id}`);
       showToast('Projet supprimé.', 'success');
       if (selectedProject?.id === id) setSelectedProject(null);
-      void load();
+      void load(true);
     } catch {
       showToast('Erreur lors de la suppression.', 'error');
     }
@@ -246,7 +246,7 @@ export function ProjectsPage() {
     try {
       await api.put(`/projects/${id}`, { status: newStatus });
       showToast('Statut mis à jour !', 'success');
-      void load();
+      void load(true);
     } catch {
       showToast('Erreur mise à jour statut.', 'error');
     }
@@ -256,7 +256,7 @@ export function ProjectsPage() {
     try {
       await api.put(`/projects/${id}`, { priority: newPriority });
       showToast('Priorité mise à jour !', 'success');
-      void load();
+      void load(true);
     } catch {
       showToast('Erreur mise à jour priorité.', 'error');
     }
