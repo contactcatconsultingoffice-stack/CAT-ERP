@@ -59,4 +59,63 @@ router.get('/summary', requireAuth, asyncHandler(async (req: Request, res: Respo
   });
 }));
 
+router.get('/financial-global', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const records = await prisma.financialRecord.findMany({
+    include: { project: { select: { name: true, type: true } } },
+    orderBy: { issuedAt: 'asc' }
+  });
+
+  const stats = {
+    totalRevenue: 0,
+    totalPending: 0,
+    quotePipeline: 0,
+    avgProjectValue: 0,
+    monthlyRevenue: [] as { month: string; revenue: number; pending: number }[],
+    revenueByType: [] as { name: string; value: number }[]
+  };
+
+  const monthlyMap = new Map<string, { revenue: number; pending: number }>();
+  const typeMap = new Map<string, number>();
+
+  records.forEach(r => {
+    const amount = Number(r.amountTTC);
+    const month = r.issuedAt.toISOString().substring(0, 7); // YYYY-MM
+    
+    if (!monthlyMap.has(month)) {
+      monthlyMap.set(month, { revenue: 0, pending: 0 });
+    }
+    const mData = monthlyMap.get(month)!;
+
+    if (r.kind === 'INVOICE') {
+      if (r.status === 'PAID') {
+        stats.totalRevenue += amount;
+        mData.revenue += amount;
+        
+        const type = r.project?.type || 'AUTRE';
+        typeMap.set(type, (typeMap.get(type) || 0) + amount);
+      } else if (r.status === 'SENT' || r.status === 'PENDING') {
+        stats.totalPending += amount;
+        mData.pending += amount;
+      }
+    } else if (r.kind === 'QUOTE' && r.status === 'SENT') {
+      stats.quotePipeline += amount;
+    }
+  });
+
+  stats.avgProjectValue = records.length > 0 ? stats.totalRevenue / records.length : 0;
+  
+  stats.monthlyRevenue = Array.from(monthlyMap.entries()).map(([month, data]) => ({
+    month,
+    revenue: data.revenue,
+    pending: data.pending
+  })).sort((a, b) => a.month.localeCompare(b.month));
+
+  stats.revenueByType = Array.from(typeMap.entries()).map(([name, value]) => ({
+    name,
+    value
+  }));
+
+  res.json(stats);
+}));
+
 export default router;

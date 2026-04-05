@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed": "ts-node --transpile-only prisma/seed.ts"
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "db:backup": "ts-node --transpile-only src/scripts/backup.ts",
+    "db:restore": "ts-node --transpile-only src/scripts/restore.ts"
   },
   "prisma": {
     "seed": "ts-node --transpile-only prisma/seed.ts"
@@ -17,6 +19,7 @@
   "dependencies": {
     "@prisma/client": "^5.15.0",
     "@types/cookie-parser": "^1.4.10",
+    "@types/pdfmake": "^0.3.2",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -24,6 +27,9 @@
     "express": "^4.19.0",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^8.0.2",
+    "otplib": "^13.4.0",
+    "pdfmake": "^0.3.7",
+    "qrcode": "^1.5.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -33,6 +39,7 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^20.11.0",
     "@types/nodemailer": "^7.0.11",
+    "@types/qrcode": "^1.5.6",
     "prisma": "^5.15.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.6.0"

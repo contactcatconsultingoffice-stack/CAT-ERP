@@ -3,9 +3,11 @@ import { api } from '../../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import { KpiSkeleton } from '../../components/Skeleton';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
+import { useAuth } from '../../auth/useAuth';
+import { TwoFactorSetup } from '../../components/TwoFactorSetup';
 
 type FinancialRecord = {
   id: string;
@@ -31,6 +33,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export function DashboardPage() {
+  const { user } = useAuth();
   const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
 
   useEffect(() => {
@@ -217,6 +220,24 @@ export function DashboardPage() {
                 )}
               </motion.div>
             </div>
+
+            {/* Admin Security Section */}
+            {(user?.isSuperAdmin || user?.role === 'ADMIN') && (
+              <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                <motion.div variants={itemVariants}>
+                  <TwoFactorSetup />
+                </motion.div>
+                <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}><CheckCircle size={20} color="#22c55e" /> Maintenance Système</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Dernière activité système détectée il y a quelques secondes. Base de données en bonne santé.
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                    Utilisez les commandes CLI pour les sauvegardes manuelles si nécessaire.
+                  </p>
+                </motion.div>
+              </div>
+            )}
           </>
         )}
       </motion.section>

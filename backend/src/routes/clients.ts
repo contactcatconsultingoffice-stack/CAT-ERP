@@ -4,8 +4,26 @@ import { requireAuth, requirePermission } from '../auth';
 import { validateRequest, ClientSchema } from '../utils/validation';
 import { asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
+import { generateClientListPDF } from '../utils/export-pdf';
 
 const router = express.Router();
+
+router.get(
+  '/export/pdf',
+  requireAuth,
+  requirePermission('clients'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const clients = await prisma.client.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    const buffer = await generateClientListPDF(clients);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=annuaire-clients.pdf');
+    res.send(buffer);
+  })
+);
 
 router.get('/', requireAuth, requirePermission('clients'), asyncHandler(async (req: Request, res: Response) => {
   const page = Math.max(1, Number(req.query.page) || 1);

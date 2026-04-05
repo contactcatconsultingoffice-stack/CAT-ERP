@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import {
   Plus,
+  Edit3,
   Trash2,
   User,
   Briefcase,
@@ -12,7 +13,8 @@ import {
   LayoutPanelTop,
   X,
   Calendar,
-  Hash
+  Hash,
+  FileText
 } from 'lucide-react';
 import { ExportButtons } from '../../components/ExportButtons';
 import { useToast } from '../../components/Toast';
@@ -97,9 +99,13 @@ export function ProjectsPage() {
   const role = user?.role;
   const { showToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(25);
   const [clients, setClients] = useState<ClientRef[]>([]);
   const [partners, setPartners] = useState<PartnerRef[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<'BOARD' | 'LIST'>('BOARD');
@@ -123,27 +129,55 @@ export function ProjectsPage() {
     setSubType(SUBTYPES[type][0]);
   }, [type]);
 
-  const load = async () => {
+  const load = async (reset = false) => {
     try {
-      setLoading(true);
-      const [proj, cls, parts] = await Promise.all([
-        api.get<{ data: Project[] }>('/projects'),
+      const targetPage = reset ? 1 : page;
+      if (reset) {
+        setLoading(true);
+        setPage(1);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const query = `/projects?page=${targetPage}&limit=${limit}&search=${encodeURIComponent(search)}`;
+      const [projRes, cls, parts] = await Promise.all([
+        api.get<{ data: Project[], totalCount: number }>(query),
         api.get<{ data: ClientRef[] }>('/clients'),
         api.get<{ data: PartnerRef[] }>('/partners')
       ]);
-      setProjects(Array.isArray(proj) ? proj : (proj.data ?? []));
+
+      const newProjects = projRes.data || [];
+      if (reset) {
+        setProjects(newProjects);
+      } else {
+        setProjects(prev => [...prev, ...newProjects]);
+      }
+      
+      setTotalCount(projRes.totalCount || 0);
       setClients(Array.isArray(cls) ? cls : (cls.data ?? []));
       setPartners(Array.isArray(parts) ? parts : (parts.data ?? []));
     } catch (err) {
       console.error(err);
+      showToast('Erreur lors du chargement des projets', 'error');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    void load();
-  }, []);
+    void load(true);
+  }, [search]); // Reload when search changes
+
+  const loadMore = () => {
+    setPage(prev => prev + 1);
+  };
+
+  useEffect(() => {
+    if (page > 1) {
+      void load(false);
+    }
+  }, [page]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -225,6 +259,21 @@ export function ProjectsPage() {
       void load();
     } catch {
       showToast('Erreur mise à jour priorité.', 'error');
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const blob = await api.getBlob('/projects/export/pdf');
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'liste_projets.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      showToast('Erreur lors de l’export PDF.', 'error');
     }
   };
 
@@ -332,6 +381,13 @@ export function ProjectsPage() {
             }))}
             filename="projets"
           />
+          <button 
+            className="ghost" 
+            onClick={handleExportPDF} 
+            style={{ borderRadius: '10px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}
+          >
+            <FileText size={18} /> Export PDF
+          </button>
           {role === 'ADMIN' && (
             <button className="btn-primary" onClick={() => { resetForm(); setShowAddModal(true); }} style={{ borderRadius: '10px', padding: '0.7rem 1.2rem' }}>
               <Plus size={18} /> New Project
@@ -462,7 +518,7 @@ export function ProjectsPage() {
                   <td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td>
                   <td style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
                     <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(p); setSelectedProject(null); }}>
-                      <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                      <Edit3 size={14} />
                     </button>
                     {role === 'ADMIN' && (
                       <button className="ghost delete-btn" onClick={(e) => handleDelete(p.id, e)}>
@@ -558,7 +614,7 @@ export function ProjectsPage() {
                         {role === 'ADMIN' && (
                           <div style={{ display: 'flex', gap: '0.3rem' }}>
                             <button className="ghost" onClick={(e) => { e.stopPropagation(); openEditModal(project); }} style={{ padding: '0.2rem' }} title="Modifier">
-                              <Plus size={14} style={{ transform: 'rotate(45deg)' }} />
+                              <Edit3 size={14} />
                             </button>
                             <button className="ghost delete-btn" onClick={(e) => handleDelete(project.id, e)} style={{ padding: '0.2rem' }}>
                               <Trash2 size={14} />
@@ -622,6 +678,25 @@ export function ProjectsPage() {
           })}
         </div>
       )}
+
+      {/* Pagination / Load More */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', marginBottom: '3rem' }}>
+        {projects.length < totalCount && (
+          <button 
+            className="btn-primary" 
+            onClick={loadMore} 
+            disabled={loadingMore}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem 2rem', borderRadius: '12px' }}
+          >
+            {loadingMore ? 'Chargement...' : `Afficher plus de projets (${projects.length} / ${totalCount})`}
+            {!loadingMore && <Plus size={18} />}
+          </button>
+        )}
+        {projects.length >= totalCount && totalCount > 0 && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Tous les projets ont été chargés ({totalCount})</p>
+        )}
+      </div>
+
       {/* Project Details Modal */}
       {selectedProject && (
         <div
@@ -678,7 +753,7 @@ export function ProjectsPage() {
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {role === 'ADMIN' && (
                   <button className="ghost" onClick={() => { openEditModal(selectedProject); setSelectedProject(null); }} style={{ padding: '0.5rem', borderRadius: '8px' }} title="Edit">
-                    <Plus size={20} style={{ transform: 'rotate(45deg)' }} />
+                    <Edit3 size={20} />
                   </button>
                 )}
                 <button className="ghost" onClick={() => setSelectedProject(null)} style={{ padding: '0.5rem', borderRadius: '8px' }}>

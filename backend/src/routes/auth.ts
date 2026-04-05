@@ -2,10 +2,12 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../prisma';
-import { signToken, setAuthCookie, clearAuthCookie, requireAuth } from '../auth'; 
+import { signToken, setAuthCookie, clearAuthCookie, requireAuth, verifyToken } from '../auth'; 
 import { authRateLimiter, asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
 import { transporter } from '../utils/email';
+const { authenticator } = require('otplib');
+import QRCode from 'qrcode';
 
 const router = express.Router();
 
@@ -41,6 +43,30 @@ router.post('/login', authRateLimiter, asyncHandler(async (req: Request, res: Re
     return res.status(401).json({ error: 'Identifiants invalides.' });
   }
 
+  if (user.isSuperAdmin && !(user as any).twoFactorEnabled) {
+    const preAuthToken = signToken({ 
+      sub: user.id, 
+      isPartial: true,
+      setupRequired: true
+    });
+    return res.json({ 
+      requires2FASetup: true,
+      preAuthToken
+    });
+  }
+
+  if ((user as any).twoFactorEnabled) {
+    const preAuthToken = signToken({ 
+      sub: user.id, 
+      isPartial: true 
+    });
+    
+    return res.json({ 
+      requires2FA: true,
+      preAuthToken
+    });
+  }
+
   const permissions = user.permissions || [];
   const token = signToken({ 
     sub: user.id, 
@@ -62,6 +88,102 @@ router.post('/login', authRateLimiter, asyncHandler(async (req: Request, res: Re
       permissions
     } 
   });
+}));
+
+router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const { token, preAuthToken } = req.body;
+  if (!token || !preAuthToken) return res.status(400).json({ error: 'Données manquantes.' });
+
+  try {
+    const decoded = verifyToken(preAuthToken);
+    if (!decoded.isPartial || !decoded.sub) {
+      return res.status(401).json({ error: 'Token invalide.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user || !user.twoFactorSecret || !user.twoFactorEnabled) {
+      return res.status(401).json({ error: '2FA non activé ou utilisateur introuvable.' });
+    }
+
+    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret as string });
+    if (!isValid) return res.status(401).json({ error: 'Code 2FA invalide.' });
+
+    const permissions = user.permissions || [];
+    const finalToken = signToken({ 
+      sub: user.id, 
+      role: user.role as 'ADMIN' | 'COLLABORATOR',
+      isSuperAdmin: user.isSuperAdmin,
+      permissions
+    });
+    
+    setAuthCookie(res, finalToken);
+    await logAction(user.id, 'LOGIN', 'USER', user.id, `Connexion 2FA réussie pour ${user.email}`);
+
+    return res.json({ 
+      user: { 
+        id: user.id, 
+        name: user.name, 
+        email: user.email, 
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin,
+        permissions
+      } 
+    });
+  } catch (err) {
+    return res.status(401).json({ error: 'Session de connexion expirée.' });
+  }
+}));
+
+router.post('/2fa/setup', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
+  if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
+
+  const secret = authenticator.generateSecret();
+  const otpauth = authenticator.keyuri(user.email, 'CAT ERP', secret);
+  const qrCodeUrl = await QRCode.toDataURL(otpauth);
+
+  await (prisma.user as any).update({
+    where: { id: user.id },
+    data: { twoFactorSecret: secret }
+  });
+
+  res.json({ qrCodeUrl, secret });
+}));
+
+router.post('/2fa/verify', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.body;
+  const user = await prisma.user.findUnique({ where: { id: req.user!.sub } }) as any;
+  if (!user || !user.twoFactorSecret) return res.status(400).json({ error: '2FA non configuré.' });
+
+  const isValid = authenticator.verify({ token, secret: user.twoFactorSecret });
+  if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
+
+  await (prisma.user as any).update({
+    where: { id: user.id },
+    data: { twoFactorEnabled: true }
+  });
+
+  await logAction(user.id, 'UPDATE', 'USER', user.id, '2FA activé');
+  res.json({ success: true });
+}));
+
+router.post('/2fa/disable', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+  const { token } = req.body;
+  const user = await prisma.user.findUnique({ where: { id: req.user!.sub } }) as any;
+  if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
+    return res.status(400).json({ error: '2FA n’est pas activé.' });
+  }
+
+  const isValid = authenticator.verify({ token, secret: user.twoFactorSecret });
+  if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
+
+  await (prisma.user as any).update({
+    where: { id: user.id },
+    data: { twoFactorEnabled: false, twoFactorSecret: null }
+  });
+
+  await logAction(user.id, 'UPDATE', 'USER', user.id, '2FA désactivé');
+  res.json({ success: true });
 }));
 
 router.post('/logout', (req: Request, res: Response) => {

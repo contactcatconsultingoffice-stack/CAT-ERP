@@ -4,9 +4,11 @@ import jwt from 'jsonwebtoken';
 
 export type JwtPayload = {
   sub: string;
-  role: 'ADMIN' | 'COLLABORATOR';
+  role?: 'ADMIN' | 'COLLABORATOR';
   isSuperAdmin?: boolean;
   permissions?: string[];
+  isPartial?: boolean;
+  setupRequired?: boolean;
 };
 
 declare module 'express-serve-static-core' {
@@ -15,10 +17,30 @@ declare module 'express-serve-static-core' {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
+// ── JWT Secret validation ─────────────────────────────────────────────────────
+// Fail fast in production if the secret is missing or is the dev placeholder
+const JWT_SECRET = process.env.JWT_SECRET || '';
+
+if (!JWT_SECRET) {
+  console.error(
+    '[FATAL] JWT_SECRET environment variable is not set. ' +
+      'Set it to a long random string in your .env file.'
+  );
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+}
+
+const EFFECTIVE_SECRET = JWT_SECRET || 'dev-secret-INSECURE-change-before-deploy';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function signToken(payload: JwtPayload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+  return jwt.sign(payload, EFFECTIVE_SECRET, { expiresIn: '8h' });
+}
+
+export function verifyToken(token: string): JwtPayload {
+  return jwt.verify(token, EFFECTIVE_SECRET) as JwtPayload;
 }
 
 export function setAuthCookie(res: Response, token: string) {
@@ -26,7 +48,7 @@ export function setAuthCookie(res: Response, token: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    maxAge: 8 * 60 * 60 * 1000 // 8 hours
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours
   });
 }
 
@@ -34,11 +56,9 @@ export function clearAuthCookie(res: Response) {
   res.clearCookie('token');
 }
 
-export function requireAuth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+// ── Middleware ────────────────────────────────────────────────────────────────
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   let token = '';
 
@@ -49,39 +69,31 @@ export function requireAuth(
   }
 
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Non authentifié.' });
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, EFFECTIVE_SECRET) as JwtPayload;
     req.user = decoded;
     return next();
   } catch {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Session expirée ou token invalide.' });
   }
 }
 
-export function requireAdmin(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Non authentifié.' });
   }
   if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ error: 'Forbidden' });
+    return res.status(403).json({ error: 'Accès réservé aux administrateurs.' });
   }
   return next();
 }
 
-export function requireSuperAdmin(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Non authentifié.' });
   }
   if (!req.user.isSuperAdmin) {
     return res.status(403).json({ error: 'Accès réservé au Super Administrateur.' });
@@ -91,14 +103,16 @@ export function requireSuperAdmin(
 
 export function requirePermission(module: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-    // Super Admin and ADMIN (Associé) overrides all
+    if (!req.user) return res.status(401).json({ error: 'Non authentifié.' });
+
+    // Super Admin and ADMIN override all permission checks
     if (req.user.isSuperAdmin || req.user.role === 'ADMIN') return next();
-    // Others (Collaborators) must have the module in their permissions
+
+    // Collaborators must have explicit module permission
     if (req.user.permissions?.includes(module)) return next();
-    
-    return res.status(403).json({ error: `Accès refusé. Vous n'avez pas la permission de gérer le module: ${module}` });
+
+    return res.status(403).json({
+      error: `Accès refusé. Permission requise : module "${module}".`,
+    });
   };
 }
-
-

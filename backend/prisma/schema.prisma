@@ -19,6 +19,8 @@ model User {
   isSuperAdmin      Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean  @default(false)
   permissions       String[] @default([]) // e.g. ["clients", "projects"]
 
   collaborator    Collaborator?

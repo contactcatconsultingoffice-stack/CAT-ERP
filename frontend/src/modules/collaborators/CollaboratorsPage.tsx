@@ -68,7 +68,10 @@ export function CollaboratorsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['collaborators', page, debouncedSearch],
-    queryFn: () => api.get<PaginatedCollaborators>(`/collaborators?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`)
+    queryFn: () =>
+      api.get<PaginatedCollaborators>(
+        `/collaborators?page=${page}&limit=${limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`
+      ),
   });
 
   const collaboratorsList = data?.data || [];
@@ -84,10 +87,14 @@ export function CollaboratorsPage() {
     try {
       await api.post<Collaborator>('/collaborators', { name, email, expertise, socialHandle, phone });
       showToast('Collaborateur ajouté !', 'success');
-      setName(''); setEmail(''); setExpertise(''); setSocialHandle(''); setPhone('');
+      setName('');
+      setEmail('');
+      setExpertise('');
+      setSocialHandle('');
+      setPhone('');
       reloadData();
     } catch {
-      showToast('Erreur lors de l\'ajout du collaborateur.', 'error');
+      showToast("Erreur lors de l'ajout du collaborateur.", 'error');
     } finally {
       setIsAdding(false);
     }
@@ -108,10 +115,10 @@ export function CollaboratorsPage() {
     try {
       await api.put(`/collaborators/${c.id}`, {
         name: editName,
-        email: c.user.email, // email stays the same
+        email: c.user.email,
         expertise: editExpertise,
         socialHandle: editSocial,
-        phone: editPhone
+        phone: editPhone,
       });
       showToast('Données mises à jour !', 'success');
       setEditingId(null);
@@ -142,17 +149,26 @@ export function CollaboratorsPage() {
       </header>
 
       <section className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
           <h2>Liste des collaborateurs</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <ExportButtons 
-              data={collaboratorsList.map(c => ({
+            <ExportButtons
+              data={collaboratorsList.map((c) => ({
                 Nom: c.user.name || '—',
                 Email: c.user.email,
                 Rôle: c.user.role,
                 Expertise: c.expertise || '—',
                 Téléphone: c.phone || '—',
-                Réseau_Social: c.socialHandle || '—'
+                Réseau_Social: c.socialHandle || '—',
               }))}
               filename="collaborateurs"
             />
@@ -160,11 +176,12 @@ export function CollaboratorsPage() {
               type="text"
               placeholder="Rechercher par nom, spécialité..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               style={{ padding: '0.5rem 0.75rem', borderRadius: '0.75rem', width: '240px', maxWidth: '100%' }}
             />
           </div>
         </div>
+
         <div className="table-responsive">
           <table className="lines-table">
             <thead>
@@ -187,116 +204,215 @@ export function CollaboratorsPage() {
                 </tr>
               ) : collaboratorsList.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}>
+                  <td
+                    colSpan={7}
+                    style={{ textAlign: 'center', color: '#94a3b8', padding: '2rem 1rem' }}
+                  >
                     Aucun collaborateur trouvé.
                   </td>
                 </tr>
-              ) : collaboratorsList.map(c => (
-                <div key={c.id} style={{ display: 'contents' }}>
-                  <tr>
-                    <td>{c.user.name || '—'}</td>
-                    <td>{c.user.email}</td>
-                    <td>
-                      <span className={`status ${c.user.role === 'ADMIN' ? 'status-late' : 'status-paid'}`}>
-                        {c.user.role === 'ADMIN' ? <ShieldAlert size={12} style={{ marginRight: 4 }} /> : null}
-                        {c.user.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}
-                      </span>
-                    </td>
-                    <td>{c.expertise || '—'}</td>
-                    <td>{c.phone || '—'}</td>
-                    <td>{c.socialHandle || '—'}</td>
-                    {role === 'ADMIN' && (
+              ) : (
+                collaboratorsList.map((c) => (
+                  <>
+                    {/* Main row — key on TR, not a wrapping div */}
+                    <tr key={c.id}>
+                      <td>{c.user.name || '—'}</td>
+                      <td>{c.user.email}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => editingId === c.id ? cancelEdit() : startEdit(c)}
-                            style={{ padding: '0.25rem 0.5rem' }}
-                            title="Modifier"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost"
-                            onClick={() => handleDelete(c.id)}
-                            style={{ padding: '0.25rem 0.5rem', color: '#f87171' }}
-                            title="Supprimer"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
+                        <span
+                          className={`status ${c.user.role === 'ADMIN' ? 'status-late' : 'status-paid'}`}
+                        >
+                          {c.user.role === 'ADMIN' ? (
+                            <ShieldAlert size={12} style={{ marginRight: 4 }} />
+                          ) : null}
+                          {c.user.role === 'ADMIN' ? 'Associé' : 'Collaborateur'}
+                        </span>
                       </td>
-                    )}
-                  </tr>
-                  {editingId === c.id && (
-                    <tr key={`edit-${c.id}`}>
-                      <td colSpan={7} style={{ padding: '0' }}>
-                        <div style={{
-                          background: 'var(--bg-main)',
-                          border: '1px solid var(--accent-primary)',
-                          borderRadius: '0.75rem',
-                          padding: '1rem 1.25rem',
-                          margin: '0.25rem 0',
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
-                          gap: '1rem',
-                          alignItems: 'end'
-                        }}>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Nom complet
-                            <input value={editName} onChange={e => setEditName(e.target.value)} style={{ padding: '0.5rem' }} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Expertise
-                            <input value={editExpertise} onChange={e => setEditExpertise(e.target.value)} placeholder="Design, Dev…" style={{ padding: '0.5rem' }} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Réseau social
-                            <input value={editSocial} onChange={e => setEditSocial(e.target.value)} placeholder="LinkedIn…" style={{ padding: '0.5rem' }} />
-                          </label>
-                          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                            Téléphone
-                            <input value={editPhone} onChange={e => setEditPhone(e.target.value)} style={{ padding: '0.5rem' }} />
-                          </label>
-                          <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.1rem' }}>
-                            <button type="button" className="btn-primary" onClick={() => handleSaveEdit(c)} disabled={isUpdating} style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                              {isUpdating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} 
-                              {isUpdating ? 'Enregistrement...' : 'Sauvegarder'}
+                      <td>{c.expertise || '—'}</td>
+                      <td>{c.phone || '—'}</td>
+                      <td>{c.socialHandle || '—'}</td>
+                      {role === 'ADMIN' && (
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() =>
+                                editingId === c.id ? cancelEdit() : startEdit(c)
+                              }
+                              style={{ padding: '0.25rem 0.5rem' }}
+                              title="Modifier"
+                            >
+                              <Edit2 size={15} />
                             </button>
-                            <button type="button" className="ghost" onClick={cancelEdit} disabled={isUpdating} style={{ padding: '0.5rem', display: 'flex', alignItems: 'center' }}>
-                              <X size={14} />
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() => handleDelete(c.id)}
+                              style={{ padding: '0.25rem 0.5rem', color: '#f87171' }}
+                              title="Supprimer"
+                            >
+                              <Trash2 size={15} />
                             </button>
                           </div>
-                        </div>
-                      </td>
+                        </td>
+                      )}
                     </tr>
-                  )}
-                </div>
-              ))}
+
+                    {/* Inline edit row — valid TR sibling */}
+                    {editingId === c.id && (
+                      <tr key={`edit-${c.id}`}>
+                        <td colSpan={role === 'ADMIN' ? 7 : 6} style={{ padding: '0' }}>
+                          <div
+                            style={{
+                              background: 'var(--bg-main)',
+                              border: '1px solid var(--accent-primary)',
+                              borderRadius: '0.75rem',
+                              padding: '1rem 1.25rem',
+                              margin: '0.25rem 0',
+                              display: 'grid',
+                              gridTemplateColumns:
+                                'repeat(auto-fit, minmax(min(100%, 180px), 1fr))',
+                              gap: '1rem',
+                              alignItems: 'end',
+                            }}
+                          >
+                            <label
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              Nom complet
+                              <input
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                style={{ padding: '0.5rem' }}
+                              />
+                            </label>
+                            <label
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              Expertise
+                              <input
+                                value={editExpertise}
+                                onChange={(e) => setEditExpertise(e.target.value)}
+                                placeholder="Design, Dev…"
+                                style={{ padding: '0.5rem' }}
+                              />
+                            </label>
+                            <label
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              Réseau social
+                              <input
+                                value={editSocial}
+                                onChange={(e) => setEditSocial(e.target.value)}
+                                placeholder="LinkedIn…"
+                                style={{ padding: '0.5rem' }}
+                              />
+                            </label>
+                            <label
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.3rem',
+                                fontSize: '0.8rem',
+                                color: 'var(--text-secondary)',
+                              }}
+                            >
+                              Téléphone
+                              <input
+                                value={editPhone}
+                                onChange={(e) => setEditPhone(e.target.value)}
+                                style={{ padding: '0.5rem' }}
+                              />
+                            </label>
+                            <div style={{ display: 'flex', gap: '0.5rem', paddingBottom: '0.1rem' }}>
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => handleSaveEdit(c)}
+                                disabled={isUpdating}
+                                style={{
+                                  padding: '0.5rem 0.9rem',
+                                  fontSize: '0.85rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                }}
+                              >
+                                {isUpdating ? (
+                                  <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                  <Check size={14} />
+                                )}
+                                {isUpdating ? 'Enregistrement...' : 'Sauvegarder'}
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost"
+                                onClick={cancelEdit}
+                                disabled={isUpdating}
+                                style={{ padding: '0.5rem', display: 'flex', alignItems: 'center' }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))
+              )}
             </tbody>
           </table>
 
           {data && data.totalPages > 1 && (
-            <div style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+            <div
+              style={{
+                padding: '1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderTop: '1px solid var(--border-color)',
+              }}
+            >
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                 Total: {data.totalCount} collaborateurs
               </span>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button 
-                  className="ghost" 
-                  disabled={page === 1} 
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                <button
+                  className="ghost"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
                   style={{ padding: '0.3rem' }}
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <span style={{ fontSize: '0.85rem' }}>Page {page} / {data.totalPages}</span>
-                <button 
-                  className="ghost" 
-                  disabled={page >= data.totalPages} 
-                  onClick={() => setPage(p => p + 1)}
+                <span style={{ fontSize: '0.85rem' }}>
+                  Page {page} / {data.totalPages}
+                </span>
+                <button
+                  className="ghost"
+                  disabled={page >= data.totalPages}
+                  onClick={() => setPage((p) => p + 1)}
                   style={{ padding: '0.3rem' }}
                 >
                   <ChevronRight size={16} />
@@ -311,13 +427,46 @@ export function CollaboratorsPage() {
         <section className="card">
           <h2>Ajouter un collaborateur</h2>
           <form onSubmit={handleAdd} className="form-grid">
-            <label>Nom complet <input value={name} onChange={e => setName(e.target.value)} required /></label>
-            <label>Email (identifiant) <input type="email" value={email} onChange={e => setEmail(e.target.value)} required /></label>
-            <label>Expertise <input value={expertise} onChange={e => setExpertise(e.target.value)} placeholder="ex: Design, Développement" /></label>
-            <label>Téléphone <input value={phone} onChange={e => setPhone(e.target.value)} /></label>
-            <label>Réseaux sociaux <input value={socialHandle} onChange={e => setSocialHandle(e.target.value)} placeholder="LinkedIn, Twitter..." /></label>
+            <label>
+              Nom complet{' '}
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+            <label>
+              Email (identifiant){' '}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Expertise{' '}
+              <input
+                value={expertise}
+                onChange={(e) => setExpertise(e.target.value)}
+                placeholder="ex: Design, Développement"
+              />
+            </label>
+            <label>
+              Téléphone{' '}
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </label>
+            <label>
+              Réseaux sociaux{' '}
+              <input
+                value={socialHandle}
+                onChange={(e) => setSocialHandle(e.target.value)}
+                placeholder="LinkedIn, Twitter..."
+              />
+            </label>
             <div>
-              <button type="submit" className="btn-primary" disabled={isAdding} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isAdding}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
                 {isAdding && <Loader2 size={16} className="animate-spin" />}
                 {isAdding ? 'Ajout...' : 'Enregistrer'}
               </button>

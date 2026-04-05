@@ -140,6 +140,25 @@ export function ClientsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2>Liste</h2>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button 
+              className="ghost" 
+              onClick={async () => {
+                try {
+                  const blob = await api.getBlob('/clients/export/pdf');
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'annuaire-clients.pdf';
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                } catch (err) {
+                  showToast('Erreur lors de l’export PDF', 'error');
+                }
+              }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600 }}
+            >
+              Exporter PDF
+            </button>
             <ExportButtons 
               data={clientsList.map(c => ({ 
                 ID: c.id, 

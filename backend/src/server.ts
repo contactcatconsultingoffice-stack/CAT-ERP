@@ -1,4 +1,9 @@
 import 'dotenv/config';
+import { validateEnv } from './utils/env-validation';
+
+// Validate environment variables on startup
+validateEnv();
+
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -30,29 +35,44 @@ app.use(securityHeaders);
 app.use('/api/', apiRateLimiter);
 app.use(cookieParser());
 
-// CORS configuration supporting comma-separated origins
-app.use(cors({
-  origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true,
-  credentials: true
-}));
-app.use(express.json());
+// CORS — strict: only allow explicitly configured origins
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173'];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow server-to-server (no origin) or matching origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    },
+    credentials: true,
+  })
+);
+
+// Body parser with explicit size limit (prevents large payload attacks)
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // Health check
-app.get('/api/health', asyncHandler(async (_req: express.Request, res: express.Response) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'ok', db: 'connected' });
-  } catch {
-    res.json({ status: 'ok', db: 'disconnected' });
-  }
-}));
+app.get(
+  '/api/health',
+  asyncHandler(async (_req: express.Request, res: express.Response) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', db: 'connected' });
+    } catch {
+      res.status(503).json({ status: 'degraded', db: 'disconnected' });
+    }
+  })
+);
 
-// API Routes
-app.use('/api/auth', authRoutes); // Note: frontend uses /api/login, etc. directly currently.
-// Wait, I should check the current frontend API calls.
-// If the frontend calls /api/login, I should mount authRoutes at /api or adjust the routes in auth.ts.
-// In auth.ts I used router.post('/login', ...). So mounting at /api works.
-app.use('/api', authRoutes);
+// API Routes — auth mounted ONCE at /api
+app.use('/api/auth', authRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/collaborators', collaboratorRoutes);
@@ -68,16 +88,15 @@ app.use('/api/rates', ratesRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/calendar', calendarRoutes);
 
-// Catch-all route for unknown API endpoints
-app.all('/api/*', (req, res) => {
-  res.status(404).json({ error: 'Route de l\'API introuvable.' });
+// Catch-all for unknown API endpoints
+app.all('/api/*', (_req, res) => {
+  res.status(404).json({ error: "Route de l'API introuvable." });
 });
 
-// GLOBAL ERROR HANDLER (MUST BE LAST APP.USE)
+// GLOBAL ERROR HANDLER (must be last)
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`Backend API listening on http://localhost:${PORT}`);
 });
