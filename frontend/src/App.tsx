@@ -11,6 +11,7 @@ import { FinancesPage } from './modules/finances/FinancesPage';
 import { ExpensesPage } from './modules/expenses/ExpensesPage';
 import { MissionsPage } from './modules/missions/MissionsPage';
 import { CollaboratorsPage } from './modules/collaborators/CollaboratorsPage';
+import { ProfilePage } from './modules/profile/ProfilePage';
 import { PartnersPage } from './modules/partners/PartnersPage';
 import { ContactsPage } from './modules/contacts/ContactsPage';
 import { UsersPage } from './modules/users/UsersPage';
@@ -45,7 +46,8 @@ import {
   Moon,
   CalendarDays,
   Wallet,
-  Receipt
+  Receipt,
+  Settings
 } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
 
@@ -352,6 +354,13 @@ export function App() {
               <div className="sidebar-user-actions">
                 <button
                   className="sidebar-action-btn"
+                  onClick={() => navigate('/profile')}
+                  title="Mon Profil & Paramètres"
+                >
+                  <Settings size={15} />
+                </button>
+                <button
+                  className="sidebar-action-btn"
                   onClick={toggleTheme}
                   title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
                 >
@@ -381,6 +390,7 @@ export function App() {
             {/* PROTECTED ROUTES */}
             <Route path="/" element={<P><DashboardPage /></P>} />
             <Route path="/dashboard" element={<P><DashboardPage /></P>} />
+            <Route path="/profile" element={<P><ProfilePage /></P>} />
             <Route path="/clients" element={<P req="clients"><ClientsPage /></P>} />
             <Route path="/projects" element={<P><ProjectsPage /></P>} />
             <Route path="/calendar" element={<P><CalendarPage /></P>} />

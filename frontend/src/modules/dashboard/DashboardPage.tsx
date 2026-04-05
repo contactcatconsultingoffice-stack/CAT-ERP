@@ -7,7 +7,6 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { useAuth } from '../../auth/useAuth';
-import { TwoFactorSetup } from '../../components/TwoFactorSetup';
 
 type FinancialRecord = {
   id: string;
@@ -224,9 +223,6 @@ export function DashboardPage() {
             {/* Admin Security Section */}
             {(user?.isSuperAdmin || user?.role === 'ADMIN') && (
               <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                <motion.div variants={itemVariants}>
-                  <TwoFactorSetup />
-                </motion.div>
                 <motion.div variants={itemVariants} className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}><CheckCircle size={20} color="#22c55e" /> Maintenance Système</h4>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
