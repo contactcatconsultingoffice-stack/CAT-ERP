@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
-import { Plus, Trash2, Mail, User, Phone, X, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Phone, X, Calendar, Loader2, LayoutGrid, List } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { CommentsPanel } from '../../components/CommentsPanel';
 
@@ -34,6 +34,7 @@ export function ContactsPage() {
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProspect, setSelectedProspect] = useState<Prospect | null>(null);
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN');
 
   // Form State
   const [name, setName] = useState('');
@@ -154,13 +155,41 @@ export function ContactsPage() {
       </header>
       
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div className="search-box">
-          <input 
-            type="text" 
-            placeholder="Nom, email, tel..." 
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="view-toggle" style={{ display: 'flex', background: 'var(--bg-card)', borderRadius: '8px', padding: '0.25rem', gap: '0.25rem', border: '1px solid var(--border-color)' }}>
+            <button
+              onClick={() => setViewMode('KANBAN')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem',
+                borderRadius: '6px', border: 'none', background: viewMode === 'KANBAN' ? 'var(--bg-main)' : 'transparent',
+                color: viewMode === 'KANBAN' ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontWeight: viewMode === 'KANBAN' ? 600 : 400,
+                cursor: 'pointer', transition: 'all 0.2s ease'
+              }}
+            >
+              <LayoutGrid size={16} /> Kanban
+            </button>
+            <button
+              onClick={() => setViewMode('LIST')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem',
+                borderRadius: '6px', border: 'none', background: viewMode === 'LIST' ? 'var(--bg-main)' : 'transparent',
+                color: viewMode === 'LIST' ? 'var(--text-primary)' : 'var(--text-muted)',
+                fontWeight: viewMode === 'LIST' ? 600 : 400,
+                cursor: 'pointer', transition: 'all 0.2s ease'
+              }}
+            >
+              <List size={16} /> Liste
+            </button>
+          </div>
+          <div className="search-box">
+            <input 
+              type="text" 
+              placeholder="Nom, email, tel..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
         </div>
         {role === 'ADMIN' && (
           <button className="btn-primary" onClick={() => setShowAddModal(!showAddModal)}>
@@ -208,7 +237,8 @@ export function ContactsPage() {
         </section>
       )}
 
-      <div className="kanban-board">
+      {viewMode === 'KANBAN' && (
+        <div className="kanban-board">
         {columns.map(statusKey => {
           const colProspects = filtered.filter(p => p.status === statusKey);
           const visibleProspects = colProspects.slice(0, 3);
@@ -329,7 +359,64 @@ export function ContactsPage() {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
+
+      {viewMode === 'LIST' && (
+        <div className="card" style={{ padding: '1.25rem', marginBottom: '2rem', overflowX: 'auto' }}>
+          <table className="table" style={{ minWidth: '840px' }}>
+            <thead>
+              <tr>
+                <th>Nom / Société</th>
+                <th>Email</th>
+                <th>Téléphone</th>
+                <th>Statut</th>
+                <th>Notes</th>
+                <th>Ajouté le</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p => (
+                <tr key={p.id} onClick={() => setSelectedProspect(p)} style={{ cursor: 'pointer' }}>
+                  <td style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{p.name}</td>
+                  <td>{p.email || '-'}</td>
+                  <td>{p.contact || '-'}</td>
+                  <td>
+                    <select
+                      value={p.status}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => handleStatusChange(p.id, e.target.value as ProspectStatus)}
+                      className={"status status-" + p.status.toLowerCase()}
+                      style={{ fontSize: '0.8rem' }}
+                    >
+                      {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-muted)' }}>
+                    {p.notes || '-'}
+                  </td>
+                  <td>{new Date(p.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
+                    {role === 'ADMIN' && (
+                      <button className="ghost delete-btn" onClick={(e) => handleDelete(p.id, e)} style={{ padding: '0.4rem' }}>
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>Aucun contact trouvé</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Prospect Details Modal */}
       {selectedProspect && (
