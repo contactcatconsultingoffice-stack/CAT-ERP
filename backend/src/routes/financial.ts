@@ -45,6 +45,7 @@ router.get(
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const kind = typeof req.query.kind === 'string' ? req.query.kind : undefined;
     const skip = (page - 1) * limit;
 
     const where: any = search
@@ -56,6 +57,10 @@ router.get(
           ],
         }
       : {};
+
+    if (kind) {
+      where.kind = kind;
+    }
 
     const [data, totalCount] = await Promise.all([
       prisma.financialRecord.findMany({
@@ -98,14 +103,15 @@ router.post(
       externalRef,
       lines,
       paymentTerms,
+      expenseCategory,
     } = req.body;
 
     if (!['QUOTE', 'INVOICE', 'EXPENSE'].includes(kind)) {
       return res.status(400).json({ error: 'Type de document invalide.' });
     }
 
-    if (!projectId) {
-      return res.status(400).json({ error: 'Un projet est requis.' });
+    if (!projectId && kind !== 'EXPENSE') {
+      return res.status(400).json({ error: 'Un projet est requis pour ce type de document.' });
     }
 
     // Auto-generate reference if not provided
@@ -131,10 +137,11 @@ router.post(
         currency: currency || 'USD',
         status: status || 'READY_TO_SEND',
         dueDate: dueDate ? new Date(dueDate) : null,
-        projectId,
+        projectId: projectId || null,
         externalRef: ref,
         lines: lines || null,
         paymentTerms: paymentTerms || null,
+        expenseCategory: expenseCategory || null,
       },
       include: { project: { include: { client: true } } },
     });
@@ -158,7 +165,7 @@ router.put(
   requirePermission('financial'),
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms } = req.body;
+    const { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms, expenseCategory } = req.body;
 
     const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
@@ -168,6 +175,7 @@ router.put(
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
     if (lines !== undefined) updateData.lines = lines;
     if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms;
+    if (expenseCategory !== undefined) updateData.expenseCategory = expenseCategory;
 
     const record = await prisma.financialRecord.update({
       where: { id },

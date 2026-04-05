@@ -8,6 +8,7 @@ import { ClientsPage } from './modules/clients/ClientsPage';
 import { ProjectsPage } from './modules/projects/ProjectsPage';
 import { FinancialPage } from './modules/financial/FinancialPage';
 import { FinancesPage } from './modules/finances/FinancesPage';
+import { ExpensesPage } from './modules/expenses/ExpensesPage';
 import { MissionsPage } from './modules/missions/MissionsPage';
 import { CollaboratorsPage } from './modules/collaborators/CollaboratorsPage';
 import { PartnersPage } from './modules/partners/PartnersPage';
@@ -328,6 +329,7 @@ export function App() {
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/financial" className="nav-link"><PieChart size={20} /><span>Factures & Devis</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('financial')) && <NavLink to="/invoices" className="nav-link"><FileText size={20} /><span>Générateur PDF</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('finances')) && <NavLink to="/finances" className="nav-link"><Wallet size={20} /><span>Finances</span></NavLink>}
+          {(role === 'ADMIN' || permissions.includes('finances')) && <NavLink to="/expenses" className="nav-link"><Receipt size={20} /><span>Dépenses</span></NavLink>}
           {(role === 'ADMIN' || permissions.includes('missions')) && <NavLink to="/missions" className="nav-link"><Clock size={20} /><span>Missions</span></NavLink>}
           {role === 'ADMIN' && <NavLink to="/users" className="nav-link"><Users size={20} /><span>Utilisateurs</span></NavLink>}
           {isSuperAdmin && <NavLink to="/admin/logs" className="nav-link"><Activity size={20} /><span>Journal d'Activité</span></NavLink>}
@@ -388,6 +390,7 @@ export function App() {
             <Route path="/financial" element={<P req="financial"><FinancialPage /></P>} />
             <Route path="/invoices" element={<P req="financial"><InvoicePage /></P>} />
             <Route path="/finances" element={<P req="finances"><FinancesPage /></P>} />
+            <Route path="/expenses" element={<P req="finances"><ExpensesPage /></P>} />
             <Route path="/missions" element={<P req="missions"><MissionsPage /></P>} />
 
             {/* ADMIN ONLY ROUTES */}

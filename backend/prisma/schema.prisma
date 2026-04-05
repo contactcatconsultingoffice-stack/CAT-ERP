@@ -107,8 +107,9 @@ model FinancialRecord {
   status       PaymentStatus   @default(PENDING)
   dueDate      DateTime?
   issuedAt     DateTime        @default(now())
-  project      Project         @relation(fields: [projectId], references: [id])
-  projectId    String
+  project      Project?        @relation(fields: [projectId], references: [id])
+  projectId    String?
+  expenseCategory ExpenseCategory?
   externalRef  String?         // e.g. QUO-1769...
   lines        Json?           // Stores invoice lines
   paymentTerms String?
@@ -232,4 +233,13 @@ model CalendarEvent {
 enum EventType {
   EVENT
   TODO
+}
+
+enum ExpenseCategory {
+  LOGICIELS_SAAS
+  DEPLACEMENTS
+  SOUS_TRAITANCE
+  MARKETING
+  SALAIRES
+  OPERATIONNEL
 }
