@@ -74,7 +74,7 @@ const SUBTYPES: Record<ProjectType, string[]> = {
     'Validation de Concept (MVP)'
   ],
   TECH: [
-    'Développement de Sites Web (Vitrine, E-commerce)',
+    'Développement de Sites Web (Vitrine, E-commerce, SaaS, CRM)',
     'Applications Mobiles & Logicielles',
     'Branding & Identité Visuelle (Logos)',
     'Marketing Digital & SEO',
@@ -152,7 +152,7 @@ export function ProjectsPage() {
       } else {
         setProjects(prev => [...prev, ...newProjects]);
       }
-      
+
       setTotalCount(projRes.totalCount || 0);
       setClients(Array.isArray(cls) ? cls : (cls.data ?? []));
       setPartners(Array.isArray(parts) ? parts : (parts.data ?? []));
@@ -381,9 +381,9 @@ export function ProjectsPage() {
             }))}
             filename="projets"
           />
-          <button 
-            className="ghost" 
-            onClick={handleExportPDF} 
+          <button
+            className="ghost"
+            onClick={handleExportPDF}
             style={{ borderRadius: '10px', padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 600 }}
           >
             <FileText size={18} /> Export PDF
@@ -473,13 +473,13 @@ export function ProjectsPage() {
           <table className="table" style={{ minWidth: '840px' }}>
             <thead>
               <tr>
-                <th>R?f</th>
+                <th>Réf</th>
                 <th>Projet</th>
                 <th>Client</th>
                 <th>Statut</th>
-                <th>Priorit?</th>
+                <th>Priorité</th>
                 <th>Type</th>
-                <th>Cr??</th>
+                <th>Créé</th>
                 <th></th>
               </tr>
             </thead>
@@ -570,7 +570,7 @@ export function ProjectsPage() {
                             borderRadius: '50%',
                             background: PRIORITY_COLORS[project.priority],
                             marginLeft: '4px'
-                          }} title={`Priorit?: ${PRIORITY_LABELS[project.priority]}`} />
+                          }} title={`Priorité: ${PRIORITY_LABELS[project.priority]}`} />
                         </div>
                         <select
                           value={project.status}
@@ -682,9 +682,9 @@ export function ProjectsPage() {
       {/* Pagination / Load More */}
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2.5rem', marginBottom: '3rem' }}>
         {projects.length < totalCount && (
-          <button 
-            className="btn-primary" 
-            onClick={loadMore} 
+          <button
+            className="btn-primary"
+            onClick={loadMore}
             disabled={loadingMore}
             style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem 2rem', borderRadius: '12px' }}
           >
