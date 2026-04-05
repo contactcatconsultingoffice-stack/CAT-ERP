@@ -139,7 +139,8 @@ router.post('/2fa/setup', requireAuth, asyncHandler(async (req: Request, res: Re
   if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
 
   const secret = generateSecret();
-  const otpauth = generateURI({ accountName: user.email, issuer: 'CAT ERP', secret });
+  const issuer = 'CAT ERP';
+  const otpauth = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;
   const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
   await (prisma.user as any).update({
