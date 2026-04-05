@@ -73,7 +73,7 @@ export function FinancesPage() {
     queryFn: () => api.get<{ rates: Record<string, number> }>('/rates'),
     staleTime: 6 * 60 * 60 * 1000,
   });
-  const rates: Record<string, number> = ratesData?.rates ?? { USD: 1, TND: 3.1 };
+  const rates: Record<string, number> = ratesData?.rates ?? { USD: 1, GNF: 8600 };
 
   // Global KPI summary — not page-limited
   const { data: summary, isLoading: summaryLoading } = useQuery({
@@ -681,11 +681,8 @@ export function FinancesPage() {
                 <label>
                   Devise
                   <select value={txCurrency} onChange={(e) => setTxCurrency(e.target.value)}>
-                    {Object.keys(rates).slice(0, 30).map((code) => (
-                      <option key={code} value={code}>
-                        {code}
-                      </option>
-                    ))}
+                    <option value="USD">USD</option>
+                    <option value="GNF">GNF</option>
                   </select>
                 </label>
                 <label>

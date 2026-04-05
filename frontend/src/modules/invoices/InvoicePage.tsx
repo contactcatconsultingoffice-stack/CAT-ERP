@@ -12,7 +12,7 @@ type InvoiceLine = {
 export function InvoicePage() {
   const [clientName, setClientName] = useState('NovaPrime Management');
   const [summary, setSummary] = useState('Conception et Développement site web + Création de logo');
-  const [currency, setCurrency] = useState<'TND' | 'EUR'>('TND');
+  const [currency, setCurrency] = useState<'USD' | 'GNF'>('USD');
   const [quoteNumber, setQuoteNumber] = useState('QUO-1769116044739');
   const [quoteDate, setQuoteDate] = useState('2026-01-22');
   const [lines, setLines] = useState<InvoiceLine[]>([
@@ -96,10 +96,10 @@ export function InvoicePage() {
             Devise
             <select
               value={currency}
-              onChange={e => setCurrency(e.target.value as 'TND' | 'EUR')}
+              onChange={e => setCurrency(e.target.value as 'USD' | 'GNF')}
             >
-              <option value="TND">TND</option>
-              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+              <option value="GNF">GNF</option>
             </select>
           </label>
           <label>

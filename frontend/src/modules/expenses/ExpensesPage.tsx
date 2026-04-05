@@ -72,7 +72,7 @@ export function ExpensesPage() {
   
   // Form State
   const [amount, setAmount] = useState<number | ''>('');
-  const [currency, setCurrency] = useState('TND');
+  const [currency, setCurrency] = useState('USD');
   const [category, setCategory] = useState<ExpenseCategory>('OPERATIONNEL');
   const [description, setDescription] = useState('');
   const [projectId, setProjectId] = useState('');
@@ -98,7 +98,7 @@ export function ExpensesPage() {
     queryFn: () => api.get<{ rates: Record<string, number> }>('/rates'),
     staleTime: 6 * 60 * 60 * 1000,
   });
-  const rates = ratesData?.rates ?? { USD: 1, TND: 3.1, EUR: 0.92 };
+  const rates = ratesData?.rates ?? { USD: 1, GNF: 8600 };
 
   const toUSD = (amt: number, curr: string) => {
     if (!rates || curr === 'USD') return amt;
@@ -310,10 +310,8 @@ export function ExpensesPage() {
               <label>
                 Devise
                 <select value={currency} onChange={e => setCurrency(e.target.value)}>
-                  <option value="TND">TND</option>
-                  <option value="EUR">EUR</option>
                   <option value="USD">USD</option>
-                  <option value="CAD">CAD</option>
+                  <option value="GNF">GNF</option>
                 </select>
               </label>
 
