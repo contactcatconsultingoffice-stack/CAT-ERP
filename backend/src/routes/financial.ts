@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requirePermission } from '../auth';
 import { asyncHandler } from '../middleware/security';
@@ -6,85 +6,206 @@ import { logAction } from '../utils/audit';
 
 const router = express.Router();
 
-router.get('/', requireAuth, requirePermission('financial'), asyncHandler(async (req, res) => {
-  const page = Math.max(1, Number(req.query.page) || 1);
-  const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
-  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-  const skip = (page - 1) * limit;
+// ── GET /financial/summary — global financial KPIs (not page-limited) ─────────
+router.get(
+  '/summary',
+  requireAuth,
+  requirePermission('financial'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const [paidInvoices, pendingInvoices, allExpenses] = await Promise.all([
+      prisma.financialRecord.findMany({
+        where: { kind: 'INVOICE', status: 'PAID' },
+        select: { amountTTC: true, currency: true },
+      }),
+      prisma.financialRecord.findMany({
+        where: { kind: 'INVOICE', status: { notIn: ['PAID'] } },
+        select: { amountTTC: true, currency: true, status: true },
+      }),
+      prisma.financialRecord.findMany({
+        where: { kind: 'EXPENSE' },
+        select: { amountTTC: true, currency: true },
+      }),
+    ]);
 
-  const where: any = search ? {
-    OR: [
-      { externalRef: { contains: search, mode: 'insensitive' } },
-      { project: { name: { contains: search, mode: 'insensitive' } } },
-      { project: { client: { name: { contains: search, mode: 'insensitive' } } } }
-    ]
-  } : {};
+    // Return raw records so frontend can apply exchange rates
+    res.json({
+      paidInvoices,
+      pendingInvoices,
+      expenses: allExpenses,
+    });
+  })
+);
 
-  const [data, totalCount] = await Promise.all([
-    prisma.financialRecord.findMany({
-      where,
-      include: { project: { include: { client: { select: { name: true, email: true } } } } },
-      orderBy: { issuedAt: 'desc' },
-      skip,
-      take: limit
-    }),
-    prisma.financialRecord.count({ where })
-  ]);
+// ── GET /financial — paginated list ──────────────────────────────────────────
+router.get(
+  '/',
+  requireAuth,
+  requirePermission('financial'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const skip = (page - 1) * limit;
 
-  res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
-}));
+    const where: any = search
+      ? {
+          OR: [
+            { externalRef: { contains: search, mode: 'insensitive' } },
+            { project: { name: { contains: search, mode: 'insensitive' } } },
+            { project: { client: { name: { contains: search, mode: 'insensitive' } } } },
+          ],
+        }
+      : {};
 
-router.post('/', requireAuth, requirePermission('financial'), asyncHandler(async (req: any, res) => {
-  const {
-    kind, amountHT, amountTTC, currency, status, dueDate, projectId, externalRef, lines, paymentTerms
-  } = req.body;
+    const [data, totalCount] = await Promise.all([
+      prisma.financialRecord.findMany({
+        where,
+        include: {
+          project: {
+            include: { client: { select: { name: true, email: true } } },
+          },
+        },
+        orderBy: { issuedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.financialRecord.count({ where }),
+    ]);
 
-  if (!['QUOTE', 'INVOICE', 'EXPENSE'].includes(kind)) {
-    return res.status(400).json({ error: 'Invalid document kind' });
-  }
+    res.json({
+      data,
+      totalCount,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+    });
+  })
+);
 
-  let ref = externalRef;
-  if (!ref) {
-    const year = new Date().getFullYear();
-    let prefix = 'FAC';
-    if (kind === 'QUOTE') prefix = 'DEV';
-    if (kind === 'EXPENSE') prefix = 'DEP';
-    
-    const count = await prisma.financialRecord.count({ where: { kind } });
-    const seq = String(count + 1).padStart(3, '0');
-    ref = `${prefix}-${year}-${seq}`;
-  }
+// ── POST /financial ──────────────────────────────────────────────────────────
+router.post(
+  '/',
+  requireAuth,
+  requirePermission('financial'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const {
+      kind,
+      amountHT,
+      amountTTC,
+      currency,
+      status,
+      dueDate,
+      projectId,
+      externalRef,
+      lines,
+      paymentTerms,
+    } = req.body;
 
-  const record = await prisma.financialRecord.create({
-    data: {
-      kind, amountHT, amountTTC, currency,
-      status: status || 'READY_TO_SEND',
-      dueDate, projectId, externalRef: ref, lines, paymentTerms
-    },
-    include: { project: { include: { client: true } } }
-  });
+    if (!['QUOTE', 'INVOICE', 'EXPENSE'].includes(kind)) {
+      return res.status(400).json({ error: 'Type de document invalide.' });
+    }
 
-  await logAction(req.user!.sub, 'CREATE', 'FINANCIAL', record.id, `Création ${kind} ${ref}`);
-  res.status(201).json(record);
-}));
+    if (!projectId) {
+      return res.status(400).json({ error: 'Un projet est requis.' });
+    }
 
-router.put('/:id', requireAuth, requirePermission('financial'), asyncHandler(async (req: any, res) => {
-  const { id } = req.params;
-  const { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms } = req.body;
-  const record = await prisma.financialRecord.update({
-    where: { id },
-    data: { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms },
-    include: { project: { include: { client: true } } }
-  });
-  await logAction(req.user!.sub, 'UPDATE', 'FINANCIAL', record.id, `Mise à jour document ${record.externalRef}`);
-  res.json(record);
-}));
+    // Auto-generate reference if not provided
+    let ref = externalRef;
+    if (!ref) {
+      const year = new Date().getFullYear();
+      const prefix = kind === 'QUOTE' ? 'DEV' : kind === 'EXPENSE' ? 'DEP' : 'FAC';
+      const count = await prisma.financialRecord.count({ where: { kind } });
+      let seq = count + 1;
+      ref = `${prefix}-${year}-${String(seq).padStart(3, '0')}`;
+      // Avoid collision
+      while (await prisma.financialRecord.findFirst({ where: { externalRef: ref } })) {
+        seq += 1;
+        ref = `${prefix}-${year}-${String(seq).padStart(3, '0')}`;
+      }
+    }
 
-router.delete('/:id', requireAuth, requirePermission('financial'), asyncHandler(async (req: any, res) => {
-  const { id } = req.params;
-  const record = await prisma.financialRecord.delete({ where: { id } });
-  await logAction(req.user!.sub, 'DELETE', 'FINANCIAL', id, `Suppression document ${record.externalRef}`);
-  res.status(204).send();
-}));
+    const record = await prisma.financialRecord.create({
+      data: {
+        kind,
+        amountHT: Number(amountHT) || 0,
+        amountTTC: Number(amountTTC) || 0,
+        currency: currency || 'USD',
+        status: status || 'READY_TO_SEND',
+        dueDate: dueDate ? new Date(dueDate) : null,
+        projectId,
+        externalRef: ref,
+        lines: lines || null,
+        paymentTerms: paymentTerms || null,
+      },
+      include: { project: { include: { client: true } } },
+    });
+
+    await logAction(
+      req.user!.sub,
+      'CREATE',
+      'FINANCIAL',
+      record.id,
+      `Création ${kind} ${ref}`
+    );
+
+    res.status(201).json(record);
+  })
+);
+
+// ── PUT /financial/:id ───────────────────────────────────────────────────────
+router.put(
+  '/:id',
+  requireAuth,
+  requirePermission('financial'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status, amountHT, amountTTC, externalRef, dueDate, lines, paymentTerms } = req.body;
+
+    const updateData: Record<string, unknown> = {};
+    if (status !== undefined) updateData.status = status;
+    if (amountHT !== undefined) updateData.amountHT = Number(amountHT);
+    if (amountTTC !== undefined) updateData.amountTTC = Number(amountTTC);
+    if (externalRef !== undefined) updateData.externalRef = externalRef;
+    if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+    if (lines !== undefined) updateData.lines = lines;
+    if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms;
+
+    const record = await prisma.financialRecord.update({
+      where: { id },
+      data: updateData,
+      include: { project: { include: { client: true } } },
+    });
+
+    await logAction(
+      req.user!.sub,
+      'UPDATE',
+      'FINANCIAL',
+      record.id,
+      `Mise à jour document ${record.externalRef}`
+    );
+
+    res.json(record);
+  })
+);
+
+// ── DELETE /financial/:id ────────────────────────────────────────────────────
+router.delete(
+  '/:id',
+  requireAuth,
+  requirePermission('financial'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const record = await prisma.financialRecord.delete({ where: { id } });
+
+    await logAction(
+      req.user!.sub,
+      'DELETE',
+      'FINANCIAL',
+      id,
+      `Suppression document ${record.externalRef}`
+    );
+
+    res.status(204).send();
+  })
+);
 
 export default router;
