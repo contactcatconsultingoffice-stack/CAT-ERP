@@ -23,7 +23,7 @@ async function request<T>(
   isBlob = false
 ): Promise<T> {
   const currentConfig = config; 
-  console.log(`[API] Sending ${method} to ${path}`);
+// Removed verbose logging
   try {
     const res = await fetch(`${currentConfig.baseUrl}${path}`, {
       method,
@@ -34,19 +34,21 @@ async function request<T>(
       body: body ? JSON.stringify(body) : undefined
     });
 
-    console.log(`[API] Received status ${res.status} from ${path}`);
+// Removed verbose logging
 
   if (res.status === 204) {
     return {} as T;
   }
 
   if (!res.ok) {
-    if (res.status === 401 && path !== '/auth/login') {
+    if (res.status === 401 && path !== '/auth/login' && path !== '/auth/2fa/login' && path !== '/auth/2fa/verify') {
       // Don't auto-redirect on /auth/me to avoid infinite loops during checkAuth
       if (path !== '/auth/me') {
         logout();
+        throw new Error('Votre session a expiré. Veuillez vous reconnecter.');
       }
-      throw new Error('Votre session a expiré. Veuillez vous reconnecter.');
+      // If it's just /auth/me, just return null or throw silent
+      return null as unknown as T;
     }
     const text = await res.text();
     try {

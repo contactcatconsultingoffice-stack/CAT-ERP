@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { requireAuth, requirePermission } from '../auth';
 import { asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
+import { validateRequest, ProspectSchema } from '../utils/validation';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/', requireAuth, requirePermission('contacts'), asyncHandler(async (
   res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
 }));
 
-router.post('/', requireAuth, requirePermission('contacts'), asyncHandler(async (req: any, res: Response) => {
+router.post('/', requireAuth, requirePermission('contacts'), validateRequest(ProspectSchema), asyncHandler(async (req: any, res: Response) => {
   const { name, contact, email, status, notes } = req.body;
   const prospect = await prisma.prospect.create({
     data: { name, contact, email, status, notes }

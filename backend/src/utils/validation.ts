@@ -42,7 +42,7 @@ export const ProjectSchema = z.object({
   status: z.enum(['PLANNING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   clientId: z.string().cuid('Client ID invalide'),
-  partnerId: z.string().cuid('Partner ID invalide').optional().nullable(),
+  partnerId: z.string().cuid('Partner ID invalide').optional().nullable().or(z.literal('')),
   description: z.string().max(1000).optional().nullable()
 });
 
@@ -55,7 +55,7 @@ export const ProjectUpdateSchema = z.object({
   status: z.enum(['PLANNING', 'IN_PROGRESS', 'COMPLETED', 'ON_HOLD']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   clientId: z.string().cuid('Client ID invalide').optional(),
-  partnerId: z.string().cuid('Partner ID invalide').optional().nullable(),
+  partnerId: z.string().cuid('Partner ID invalide').optional().nullable().or(z.literal('')),
   description: z.string().max(1000).optional().nullable()
 });
 
@@ -74,4 +74,36 @@ export const UserSchema = z.object({
   password: z.string().min(6, 'Mot de passe trop court - min 6'),
   role: z.enum(['ADMIN', 'COLLABORATOR']),
   gender: z.enum(['Homme', 'Femme']).optional().nullable()
+});
+
+export const FinancialRecordSchema = z.object({
+  kind: z.enum(['QUOTE', 'INVOICE', 'EXPENSE']),
+  amountHT: z.number().or(z.string().transform(v => Number(v))),
+  amountTTC: z.number().or(z.string().transform(v => Number(v))),
+  currency: z.string().min(1).max(10).optional(),
+  status: z.string().optional(),
+  dueDate: z.string().optional().nullable().transform(v => v ? new Date(v) : null),
+  projectId: z.string().cuid('Project ID invalide').optional().nullable(),
+  externalRef: z.string().max(100).optional().nullable(),
+  lines: z.any().optional().nullable(),
+  paymentTerms: z.string().max(2000).optional().nullable(),
+  expenseCategory: z.string().max(100).optional().nullable()
+});
+
+export const ContractSchema = z.object({
+  type: z.enum(['PRESTATION', 'COLLABORATION', 'PARTNERSHIP']),
+  title: z.string().min(2).max(200),
+  rawText: z.string().min(10),
+  projectId: z.string().cuid('Project ID invalide').optional().nullable(),
+  financialId: z.string().cuid('Financial ID invalide').optional().nullable(),
+  signedAt: z.string().optional().nullable().transform(v => v ? new Date(v) : null),
+  location: z.string().max(200).optional().nullable()
+});
+
+export const ProspectSchema = z.object({
+  name: z.string().min(2).max(100),
+  contact: z.string().max(100).optional().nullable(),
+  email: z.string().email('Email invalide').optional().nullable().or(z.literal('')),
+  status: z.string().optional(),
+  notes: z.string().max(2000).optional().nullable()
 });

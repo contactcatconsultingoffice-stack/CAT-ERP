@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { prisma } from '../prisma';
 import { requireAuth, requirePermission } from '../auth';
 import { asyncHandler } from '../middleware/security';
+import { validateRequest, ContractSchema } from '../utils/validation';
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.get('/', requireAuth, requirePermission('contracts'), asyncHandler(async 
   res.json({ data, totalCount, currentPage: page, totalPages: Math.ceil(totalCount / limit) });
 }));
 
-router.post('/', requireAuth, requirePermission('contracts'), asyncHandler(async (req: any, res: Response) => {
+router.post('/', requireAuth, requirePermission('contracts'), validateRequest(ContractSchema), asyncHandler(async (req: any, res: Response) => {
   const { type, title, rawText, projectId, financialId, signedAt, location } =
     req.body;
 

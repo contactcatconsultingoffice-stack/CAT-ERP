@@ -543,12 +543,21 @@ export function FinancialPage() {
                     currency={previewRecord.currency || 'USD'}
                     quoteNumber={previewRecord.externalRef || ''}
                     quoteDate={new Date(previewRecord.issuedAt).toLocaleDateString('fr-FR')}
-                    lines={previewRecord.lines && Array.isArray(previewRecord.lines) ? previewRecord.lines : [{
-                      id: 1,
-                      description: `Prestation globale pour le projet : ${previewRecord.project?.name}`,
-                      quantity: 1,
-                      unitPrice: Number(previewRecord.amountHT)
-                    }]}
+                    lines={
+                      previewRecord.lines && Array.isArray(previewRecord.lines) && previewRecord.lines.length > 0
+                        ? previewRecord.lines.map((l: any, i: number) => ({
+                            id: l.id ?? i,
+                            description: l.description || '',
+                            quantity: Number(l.quantity) || 1,
+                            unitPrice: Number(l.unitPrice) || 0
+                          }))
+                        : [{
+                            id: 1,
+                            description: `Prestation globale pour le projet : ${previewRecord.project?.name || ''}`,
+                            quantity: 1,
+                            unitPrice: Number(previewRecord.amountHT) || 0
+                          }]
+                    }
                     taxAmount={Number(previewRecord.amountTTC) - Number(previewRecord.amountHT)}
                     paymentTerms={previewRecord.paymentTerms || "Facture payable à réception."}
                   />

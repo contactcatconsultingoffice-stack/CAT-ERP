@@ -3,6 +3,7 @@ import { prisma } from '../prisma';
 import { requireAuth, requirePermission } from '../auth';
 import { asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
+import { validateRequest, FinancialRecordSchema } from '../utils/validation';
 
 const router = express.Router();
 
@@ -91,6 +92,7 @@ router.post(
   '/',
   requireAuth,
   requirePermission('financial'),
+  validateRequest(FinancialRecordSchema),
   asyncHandler(async (req: Request, res: Response) => {
     const {
       kind,

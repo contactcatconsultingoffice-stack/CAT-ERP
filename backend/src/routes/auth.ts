@@ -2,18 +2,24 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../prisma';
-import { signToken, setAuthCookie, clearAuthCookie, requireAuth, verifyToken } from '../auth'; 
+import { signToken, setAuthCookie, clearAuthCookie, requireAuth, verifyToken, getUserFromRequest } from '../auth'; 
 import { authRateLimiter, asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
 import { transporter } from '../utils/email';
-const { generateSecret, generateURI, verifySync } = require('otplib');
+import { generateSecret, generateURI, verify } from 'otplib';
 import QRCode from 'qrcode';
 
 const router = express.Router();
 
-router.get('/me', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.get('/me', asyncHandler(async (req: Request, res: Response) => {
+  const userPayload = getUserFromRequest(req);
+  
+  if (!userPayload) {
+    return res.json(null);
+  }
+
   const user = await prisma.user.findUnique({
-    where: { id: req.user!.sub },
+    where: { id: userPayload.sub },
     select: {
       id: true,
       name: true,
@@ -97,7 +103,7 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
   try {
     const decoded = verifyToken(preAuthToken);
     if (!decoded.isPartial || !decoded.sub) {
-      return res.status(401).json({ error: 'Token invalide.' });
+      return res.status(401).json({ error: 'Session de connexion invalide.' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
@@ -105,7 +111,13 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
       return res.status(401).json({ error: '2FA non activé ou utilisateur introuvable.' });
     }
 
-    const isValid = verifySync({ token, secret: user.twoFactorSecret as string }).valid;
+    // verify with a window of 2 (prevents clock drift issues of +/- 60 seconds)
+    const isValid = await (verify as any)({ 
+      token, 
+      secret: user.twoFactorSecret as string,
+      window: 2
+    });
+
     if (!isValid) return res.status(401).json({ error: 'Code 2FA invalide.' });
 
     const permissions = user.permissions || [];
@@ -129,8 +141,12 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
         permissions
       } 
     });
-  } catch (err) {
-    return res.status(401).json({ error: 'Session de connexion expirée.' });
+  } catch (err: any) {
+    console.error('[AUTH] 2FA Login Error:', err.message || err);
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Session de connexion expirée. Veuillez recommencer.' });
+    }
+    return res.status(401).json({ error: `Erreur de session : ${err.message || 'Inconnue'}` });
   }
 }));
 
@@ -140,7 +156,7 @@ router.post('/2fa/setup', requireAuth, asyncHandler(async (req: Request, res: Re
 
   const secret = generateSecret();
   const issuer = 'CAT ERP';
-  const otpauth = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`;
+  const otpauth = generateURI({ label: user.email, issuer, secret });
   const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
   await (prisma.user as any).update({
@@ -156,7 +172,7 @@ router.post('/2fa/verify', requireAuth, asyncHandler(async (req: Request, res: R
   const user = await prisma.user.findUnique({ where: { id: req.user!.sub } }) as any;
   if (!user || !user.twoFactorSecret) return res.status(400).json({ error: '2FA non configuré.' });
 
-  const isValid = verifySync({ token, secret: user.twoFactorSecret }).valid;
+  const isValid = await (verify as any)({ token, secret: user.twoFactorSecret, window: 1 });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
   await (prisma.user as any).update({
@@ -175,7 +191,7 @@ router.post('/2fa/disable', requireAuth, asyncHandler(async (req: Request, res: 
     return res.status(400).json({ error: '2FA n’est pas activé.' });
   }
 
-  const isValid = verifySync({ token, secret: user.twoFactorSecret }).valid;
+  const isValid = await (verify as any)({ token, secret: user.twoFactorSecret, window: 1 });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
   await (prisma.user as any).update({

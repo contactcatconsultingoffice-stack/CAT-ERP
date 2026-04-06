@@ -58,7 +58,7 @@ export function clearAuthCookie(res: Response) {
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export function getUserFromRequest(req: Request): JwtPayload | null {
   const authHeader = req.headers.authorization;
   let token = '';
 
@@ -68,17 +68,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     token = (req as any).cookies.token;
   }
 
-  if (!token) {
-    return res.status(401).json({ error: 'Non authentifié.' });
-  }
+  if (!token) return null;
 
   try {
-    const decoded = jwt.verify(token, EFFECTIVE_SECRET) as JwtPayload;
-    req.user = decoded;
-    return next();
+    return jwt.verify(token, EFFECTIVE_SECRET) as JwtPayload;
   } catch {
-    return res.status(401).json({ error: 'Session expirée ou token invalide.' });
+    return null;
   }
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const user = getUserFromRequest(req);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Non authentifié ou session expirée.' });
+  }
+
+  req.user = user;
+  return next();
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {

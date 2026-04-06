@@ -1,150 +1,145 @@
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Use require for pdfmake due to type definition inconsistences with constructability
-const PdfPrinter = require('pdfmake/js/printer').default;
+const pdfmake = require('pdfmake');
 
-const fonts = {
+pdfmake.setFonts({
   Roboto: {
     normal: 'Helvetica',
     bold: 'Helvetica-Bold',
     italics: 'Helvetica-Oblique',
     bolditalics: 'Helvetica-BoldOblique'
   }
-};
+});
 
-const printer = new PdfPrinter(fonts);
+// Load the CAT Consulting logo as base64 for embedding in PDFs
+const LOGO_PATH = path.join(__dirname, '../assets/images/Logo moderne de CAT Consulting.png');
+let LOGO_BASE64: string | null = null;
+try {
+  const logoBuffer = fs.readFileSync(LOGO_PATH);
+  LOGO_BASE64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+} catch {
+  console.warn('[PDF] Logo not found at', LOGO_PATH, '— PDFs will be generated without logo.');
+}
 
-export const generateProjectListPDF = (projects: any[]): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const docDefinition: TDocumentDefinitions = {
-      content: [
-        { text: 'CAT Consulting Office - Liste des Projets', style: 'header' },
-        { text: `Généré le : ${new Date().toLocaleDateString('fr-FR')}`, style: 'subheader' },
+// Shared header builder with logo + company name
+function buildHeader(title: string): any[] {
+  const header: any[] = [
+    {
+      columns: [
+        LOGO_BASE64
+          ? { image: LOGO_BASE64, width: 120, margin: [0, 0, 0, 0] }
+          : { text: 'CAT Consulting', bold: true, fontSize: 16, color: '#2563eb' },
         {
-          table: {
-            headerRows: 1,
-            widths: ['auto', '*', 'auto', 'auto', 'auto'],
-            body: [
-              [
-                { text: 'Référence', style: 'tableHeader' },
-                { text: 'Nom du Projet', style: 'tableHeader' },
-                { text: 'Client', style: 'tableHeader' },
-                { text: 'Statut', style: 'tableHeader' },
-                { text: 'Priorité', style: 'tableHeader' }
-              ],
-              ...projects.map(p => [
-                p.reference || 'N/A',
-                p.name,
-                p.client?.name || 'N/A',
-                p.status,
-                p.priority
-              ])
-            ]
-          },
-          layout: 'lightHorizontalLines'
+          stack: [
+            { text: title, style: 'header' },
+            { text: `Généré le : ${new Date().toLocaleDateString('fr-FR')}`, style: 'subheader' },
+          ],
+          alignment: 'right',
         }
       ],
-      styles: {
-        header: {
-          fontSize: 18,
-          bold: true,
-          margin: [0, 0, 0, 10],
-          color: '#2563eb'
-        },
-        subheader: {
-          fontSize: 10,
-          margin: [0, 0, 0, 20],
-          color: '#64748b'
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 11,
-          color: 'white',
-          fillColor: '#2563eb',
-          margin: [5, 2, 5, 2]
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 10
-      }
-    };
+      margin: [0, 0, 0, 20]
+    },
+    { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1.5, lineColor: '#2563eb' }], margin: [0, 0, 0, 20] }
+  ];
+  return header;
+}
 
-    try {
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-      const chunks: any[] = [];
-      pdfDoc.on('data', (chunk: any) => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', (err: any) => reject(err));
-      pdfDoc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
+const sharedStyles: TDocumentDefinitions['styles'] = {
+  header: {
+    fontSize: 16,
+    bold: true,
+    color: '#2563eb'
+  },
+  subheader: {
+    fontSize: 9,
+    color: '#64748b',
+    margin: [0, 2, 0, 0]
+  },
+  tableHeader: {
+    bold: true,
+    fontSize: 10,
+    color: 'white',
+    fillColor: '#2563eb',
+    margin: [5, 4, 5, 4]
+  }
 };
-export const generateClientListPDF = (clients: any[]): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const docDefinition: TDocumentDefinitions = {
-      content: [
-        { text: 'CAT Consulting Office - Annuaire Clients', style: 'header' },
-        { text: `Généré le : ${new Date().toLocaleDateString('fr-FR')}`, style: 'subheader' },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', 'auto', 'auto', 'auto'],
-            body: [
-              [
-                { text: 'Nom du Client', style: 'tableHeader' },
-                { text: 'Contact', style: 'tableHeader' },
-                { text: 'Email', style: 'tableHeader' },
-                { text: 'Type', style: 'tableHeader' }
-              ],
-              ...clients.map(c => [
-                c.name,
-                c.contact || 'N/A',
-                c.email || 'N/A',
-                c.type || 'N/A'
-              ])
-            ]
-          },
-          layout: 'lightHorizontalLines'
-        }
-      ],
-      styles: {
-        header: {
-          fontSize: 18,
-          bold: true,
-          margin: [0, 0, 0, 10],
-          color: '#2563eb'
-        },
-        subheader: {
-          fontSize: 10,
-          margin: [0, 0, 0, 20],
-          color: '#64748b'
-        },
-        tableHeader: {
-          bold: true,
-          fontSize: 11,
-          color: 'white',
-          fillColor: '#2563eb',
-          margin: [5, 2, 5, 2]
-        }
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 10
-      }
-    };
 
-    try {
-      const pdfDoc = printer.createPdfKitDocument(docDefinition);
-      const chunks: any[] = [];
-      pdfDoc.on('data', (chunk: any) => chunks.push(chunk));
-      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-      pdfDoc.on('error', (err: any) => reject(err));
-      pdfDoc.end();
-    } catch (err) {
-      reject(err);
-    }
-  });
+export const generateProjectListPDF = async (projects: any[]): Promise<Buffer> => {
+  const docDefinition: TDocumentDefinitions = {
+    content: [
+      ...buildHeader('Liste des Projets'),
+      {
+        table: {
+          headerRows: 1,
+          widths: ['auto', '*', 'auto', 'auto', 'auto'],
+          body: [
+            [
+              { text: 'Référence', style: 'tableHeader' },
+              { text: 'Nom du Projet', style: 'tableHeader' },
+              { text: 'Client', style: 'tableHeader' },
+              { text: 'Statut', style: 'tableHeader' },
+              { text: 'Priorité', style: 'tableHeader' }
+            ],
+            ...projects.map(p => [
+              { text: p.reference || 'N/A', fontSize: 9 },
+              { text: p.name, fontSize: 9 },
+              { text: p.client?.name || 'N/A', fontSize: 9 },
+              { text: p.status, fontSize: 9 },
+              { text: p.priority, fontSize: 9 }
+            ])
+          ]
+        },
+        layout: 'lightHorizontalLines'
+      }
+    ],
+    styles: sharedStyles,
+    defaultStyle: {
+      font: 'Roboto',
+      fontSize: 10
+    },
+    pageMargins: [40, 40, 40, 40]
+  };
+
+  const pdfDocument = pdfmake.createPdf(docDefinition);
+  return await pdfDocument.getBuffer();
+};
+
+export const generateClientListPDF = async (clients: any[]): Promise<Buffer> => {
+  const docDefinition: TDocumentDefinitions = {
+    content: [
+      ...buildHeader('Annuaire Clients'),
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto', '*', 'auto'],
+          body: [
+            [
+              { text: 'Nom du Client', style: 'tableHeader' },
+              { text: 'Contact', style: 'tableHeader' },
+              { text: 'Email', style: 'tableHeader' },
+              { text: 'Téléphone', style: 'tableHeader' }
+            ],
+            ...clients.map(c => [
+              { text: c.name, fontSize: 9 },
+              { text: c.contact || 'N/A', fontSize: 9 },
+              { text: c.email || 'N/A', fontSize: 9 },
+              { text: c.phone || 'N/A', fontSize: 9 }
+            ])
+          ]
+        },
+        layout: 'lightHorizontalLines'
+      }
+    ],
+    styles: sharedStyles,
+    defaultStyle: {
+      font: 'Roboto',
+      fontSize: 10
+    },
+    pageMargins: [40, 40, 40, 40]
+  };
+
+  const pdfDocument = pdfmake.createPdf(docDefinition);
+  return await pdfDocument.getBuffer();
 };
