@@ -5,7 +5,9 @@ export type ApiConfig = {
 };
 
 const defaultConfig: ApiConfig = {
-  baseUrl: '/api'
+  // In production (Vercel), VITE_API_URL points to the Render backend.
+  // In development, Vite's proxy forwards /api → localhost:4000.
+  baseUrl: (import.meta.env.VITE_API_URL as string) || '/api'
 };
 
 let config: ApiConfig = defaultConfig;

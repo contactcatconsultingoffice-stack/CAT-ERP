@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
     "seed": "ts-node --transpile-only prisma/seed.ts",
+    "postinstall": "npm run prisma:generate",
     "db:backup": "ts-node --transpile-only src/scripts/backup.ts",
     "db:restore": "ts-node --transpile-only src/scripts/restore.ts"
   },

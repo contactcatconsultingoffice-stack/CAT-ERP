@@ -91,4 +91,23 @@ Restore your system from a previous backup state.
 
 ---
 
+## 🗺️ Roadmap de Déploiement & Distribution
+
+Nous suivons une approche en 3 étapes pour rendre l'application accessible partout :
+
+### 1. Déploiement Cloud (En cours)
+- **Frontend :** Déployé sur **Vercel** pour une performance optimale et une distribution de contenu mondiale.
+- **Backend :** Déployé sur **Render** (Node.js + PostgreSQL) pour une gestion fiable des données et des tâches de fond.
+
+### 2. Progressive Web App (PWA)
+- Transformation de l'application web en une application installable directement depuis le navigateur.
+- Fonctionne sur **Windows, macOS, Android et iOS**.
+- Offre une expérience fluide avec icône sur le bureau/écran d'accueil sans passer par les Stores.
+
+### 3. Application Native Desktop (Electron)
+- Pour un installateur Windows (`.exe`) officiel.
+- Permet une intégration plus poussée avec le système de fichiers local si nécessaire.
+
+---
+
 *Custom developed by CAT Consulting Office IT.*
