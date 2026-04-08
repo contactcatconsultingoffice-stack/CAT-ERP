@@ -172,7 +172,11 @@ router.post('/2fa/verify', requireAuth, asyncHandler(async (req: Request, res: R
   const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
   if (!user || !user.twoFactorSecret) return res.status(400).json({ error: '2FA non configuré.' });
 
-  const { valid: isValid } = await verify({ token, secret: user.twoFactorSecret, epochTolerance: 30 });
+  const { valid: isValid } = await verify({ 
+    token, 
+    secret: user.twoFactorSecret, 
+    epochTolerance: 60 
+  });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
   await prisma.user.update({
@@ -191,7 +195,11 @@ router.post('/2fa/disable', requireAuth, asyncHandler(async (req: Request, res: 
     return res.status(400).json({ error: '2FA n’est pas activé.' });
   }
 
-  const { valid: isValid } = await verify({ token, secret: user.twoFactorSecret, epochTolerance: 30 });
+  const { valid: isValid } = await verify({ 
+    token, 
+    secret: user.twoFactorSecret, 
+    epochTolerance: 60 
+  });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
   await prisma.user.update({
