@@ -73,7 +73,6 @@ export function CommentsPanel({ entityType, entityId }: Props) {
       setComments(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('[CommentsPanel] Failed to load comments:', err);
-      // silently fail
     } finally {
       setLoading(false);
     }
@@ -103,6 +102,8 @@ export function CommentsPanel({ entityType, entityId }: Props) {
       setText('');
     } catch (err) {
       console.error('[CommentsPanel] Failed to send comment:', err);
+    } finally {
+      setSending(false);
     }
   };
 
