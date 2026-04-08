@@ -60,7 +60,6 @@ export function FinancialPage() {
   const limit = 20;
 
   const [showAdd, setShowAdd] = useState(false);
-  const [rates, setRates] = useState<Record<string, number>>({ USD: 1 });
   const [previewRecord, setPreviewRecord] = useState<FinancialRecord | null>(null);
 
   // New Record Form State
@@ -98,9 +97,7 @@ export function FinancialPage() {
     staleTime: 3600000 // Cache for 1 hour
   });
 
-  useEffect(() => {
-    if (exchangeRates) setRates(exchangeRates);
-  }, [exchangeRates]);
+  const rates = exchangeRates || { USD: 1 };
 
   const { data, isLoading } = useQuery({
     queryKey: ['financial', page, debouncedSearch],

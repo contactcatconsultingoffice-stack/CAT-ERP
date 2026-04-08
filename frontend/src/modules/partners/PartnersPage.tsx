@@ -82,7 +82,8 @@ export function PartnersPage() {
       showToast('Partenaire ajouté !', 'success');
       setName(''); setContact(''); setEmail(''); setPhone(''); setLinks('');
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[PartnersPage] Failed to add partner:', err);
       showToast('Erreur lors de l\'ajout du partenaire.', 'error');
     } finally {
       setIsAdding(false);
@@ -107,7 +108,8 @@ export function PartnersPage() {
       showToast('Partenaire mis à jour !', 'success');
       setEditingId(null);
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[PartnersPage] Failed to update partner:', err);
       showToast('Erreur lors de la mise à jour.', 'error');
     } finally {
       setIsUpdating(false);
@@ -120,7 +122,8 @@ export function PartnersPage() {
       await api.delete(`/partners/${id}`);
       showToast('Partenaire supprimé.', 'success');
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[PartnersPage] Failed to delete partner:', err);
       showToast('Erreur lors de la suppression.', 'error');
     }
   };

@@ -92,7 +92,8 @@ export function ContractsPage() {
       });
       showToast('Contrat sauvegardé !', 'success');
       queryClient.invalidateQueries({ queryKey: ['contracts'] });
-    } catch {
+    } catch (err) {
+      console.error('[ContractsPage] Failed to save contract:', err);
       showToast('Erreur lors de la sauvegarde.', 'error');
     }
   };

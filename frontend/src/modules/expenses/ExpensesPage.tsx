@@ -151,7 +151,8 @@ export function ExpensesPage() {
       setProjectId('');
       queryClient.invalidateQueries({ queryKey: ['expensesList'] });
       queryClient.invalidateQueries({ queryKey: ['financialSummary'] }); // Update global finances
-    } catch {
+    } catch (err) {
+      console.error('[ExpensesPage] Failed to save expense:', err);
       showToast('Erreur lors de la sauvegarde.', 'error');
     } finally {
       setIsSaving(false);

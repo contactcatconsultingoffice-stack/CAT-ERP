@@ -237,7 +237,8 @@ export function ProjectsPage() {
       showToast('Projet supprimé.', 'success');
       if (selectedProject?.id === id) setSelectedProject(null);
       void load(true);
-    } catch {
+    } catch (err) {
+      console.error('[ProjectsPage] Failed to delete project:', err);
       showToast('Erreur lors de la suppression.', 'error');
     }
   };
@@ -247,7 +248,8 @@ export function ProjectsPage() {
       await api.put(`/projects/${id}`, { status: newStatus });
       showToast('Statut mis à jour !', 'success');
       void load(true);
-    } catch {
+    } catch (err) {
+      console.error('[ProjectsPage] Failed to update status:', err);
       showToast('Erreur mise à jour statut.', 'error');
     }
   };
@@ -257,7 +259,8 @@ export function ProjectsPage() {
       await api.put(`/projects/${id}`, { priority: newPriority });
       showToast('Priorité mise à jour !', 'success');
       void load(true);
-    } catch {
+    } catch (err) {
+      console.error('[ProjectsPage] Failed to update priority:', err);
       showToast('Erreur mise à jour priorité.', 'error');
     }
   };

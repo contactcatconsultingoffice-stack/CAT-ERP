@@ -49,7 +49,8 @@ export function ContactsPage() {
       const res = await api.get<{ data: Prospect[] }>('/prospects');
       setProspects(Array.isArray(res) ? res : (res.data ?? []));
     } catch (err) {
-      console.error(err);
+      console.error('[ContactsPage] Failed to load prospects:', err);
+      showToast('Erreur lors du chargement des contacts.', 'error');
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,8 @@ export function ContactsPage() {
       await api.delete(`/prospects/${id}`);
       showToast('Contact supprimé.', 'success');
       void load();
-    } catch {
+    } catch (err) {
+      console.error('[ContactsPage] Failed to delete prospect:', err);
       showToast('Erreur lors de la suppression.', 'error');
     }
   };
@@ -100,7 +102,8 @@ export function ContactsPage() {
       });
       showToast('Statut mis à jour !', 'success');
       void load();
-    } catch {
+    } catch (err) {
+      console.error('[ContactsPage] Failed to update status:', err);
       showToast('Erreur mise à jour statut.', 'error');
     }
   };

@@ -93,7 +93,8 @@ export function CollaboratorsPage() {
       setSocialHandle('');
       setPhone('');
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[CollaboratorsPage] Failed to add collaborator:', err);
       showToast("Erreur lors de l'ajout du collaborateur.", 'error');
     } finally {
       setIsAdding(false);
@@ -123,7 +124,8 @@ export function CollaboratorsPage() {
       showToast('Données mises à jour !', 'success');
       setEditingId(null);
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[CollaboratorsPage] Failed to update collaborator:', err);
       showToast('Erreur lors de la mise à jour.', 'error');
     } finally {
       setIsUpdating(false);
@@ -136,7 +138,8 @@ export function CollaboratorsPage() {
       await api.delete(`/collaborators/${id}`);
       showToast('Collaborateur supprimé.', 'success');
       reloadData();
-    } catch {
+    } catch (err) {
+      console.error('[CollaboratorsPage] Failed to delete collaborator:', err);
       showToast('Erreur lors de la suppression.', 'error');
     }
   };
