@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { Trash2, Plus, Receipt, FileText, Download, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { InvoicePdf } from '../invoices/InvoicePdf';
+import { InvoicePdf, type InvoiceProps } from '../invoices/InvoicePdf';
 import { useToast } from '../../components/Toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -538,11 +538,18 @@ export function FinancialPage() {
               <PDFDownloadLink
                 document={
                   <InvoicePdf
+                    kind={previewRecord.kind === 'QUOTE' ? 'DEVIS' : 'FACTURE'}
+                    docNumber={previewRecord.externalRef || 'N/A'}
+                    issuedAt={new Date(previewRecord.issuedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    dueOrValidUntil={
+                      (() => {
+                        const d = new Date(previewRecord.issuedAt);
+                        d.setDate(d.getDate() + 30);
+                        return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+                      })()
+                    }
                     clientName={previewRecord.project?.client?.name || 'Client'}
-                    summary={previewRecord.kind === 'QUOTE' ? 'Devis prestation de services' : 'Prestation facturée'}
-                    currency={previewRecord.currency || 'USD'}
-                    quoteNumber={previewRecord.externalRef || ''}
-                    quoteDate={new Date(previewRecord.issuedAt).toLocaleDateString('fr-FR')}
+                    projectRef={previewRecord.project?.name}
                     lines={
                       previewRecord.lines && Array.isArray(previewRecord.lines) && previewRecord.lines.length > 0
                         ? previewRecord.lines.map((l: any, i: number) => ({
@@ -553,13 +560,15 @@ export function FinancialPage() {
                           }))
                         : [{
                             id: 1,
-                            description: `Prestation globale pour le projet : ${previewRecord.project?.name || ''}`,
+                            description: `Prestation globale — ${previewRecord.project?.name || ''}`,
                             quantity: 1,
                             unitPrice: Number(previewRecord.amountHT) || 0
                           }]
                     }
+                    currency={previewRecord.currency || 'USD'}
                     taxAmount={Number(previewRecord.amountTTC) - Number(previewRecord.amountHT)}
-                    paymentTerms={previewRecord.paymentTerms || "Facture payable à réception."}
+                    paymentTerms={previewRecord.paymentTerms || "Paiement à réception. En cas de retard, une pénalité de 10% sera appliquée ainsi qu'une indemnité forfaitaire de 40€."}
+                    bankHolder="CAT Consulting"
                   />
                 }
                 fileName={`${previewRecord.externalRef || previewRecord.kind}.pdf`}
