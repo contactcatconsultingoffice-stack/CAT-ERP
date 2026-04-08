@@ -19,19 +19,17 @@ declare module 'express-serve-static-core' {
 
 // ── JWT Secret validation ─────────────────────────────────────────────────────
 // Fail fast in production if the secret is missing or is the dev placeholder
-const JWT_SECRET = process.env.JWT_SECRET || '';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET) {
   console.error(
     '[FATAL] JWT_SECRET environment variable is not set. ' +
       'Set it to a long random string in your .env file.'
   );
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1);
-  }
+  process.exit(1); // Fail fast in ALL environments — no dev-secret fallback
 }
 
-const EFFECTIVE_SECRET = JWT_SECRET || 'dev-secret-INSECURE-change-before-deploy';
+const EFFECTIVE_SECRET = JWT_SECRET;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,15 +57,9 @@ export function clearAuthCookie(res: Response) {
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 export function getUserFromRequest(req: Request): JwtPayload | null {
-  const authHeader = req.headers.authorization;
-  let token = '';
-
-  if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.slice('Bearer '.length);
-  } else if ((req as any).cookies?.token) {
-    token = (req as any).cookies.token;
-  }
-
+  // HttpOnly cookie ONLY — Bearer header bypassed to prevent header injection attacks.
+  // The Electron desktop app sends requests to the API server directly via the same cookie mechanism.
+  const token = (req as any).cookies?.token;
   if (!token) return null;
 
   try {

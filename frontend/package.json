@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "electron:dev": "vite",
-    "electron:build": "vite build && electron-builder",
+    "electron:dev": "cross-env BUILD_TARGET=electron vite",
+    "electron:build": "cross-env BUILD_TARGET=electron vite build && electron-builder",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --max-warnings=0"
   },

@@ -3,6 +3,14 @@ import { Request, Response, NextFunction } from 'express';
 // In-memory rate limiter to prevent basic brute force and DDoS without external dependencies (Redis)
 const rateLimits = new Map<string, { count: number, resetTime: number }>();
 
+// Periodically purge expired entries to prevent memory leaks in long-running processes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of rateLimits.entries()) {
+    if (val.resetTime < now) rateLimits.delete(key);
+  }
+}, 5 * 60 * 1000); // every 5 minutes
+
 function createRateLimiter(limiterName: string, maxReq: number, windowMs: number) {
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
@@ -35,8 +43,9 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   
-  // CSP: Block inline scripts/styles unless necessary (adjust if you use inline styles)
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'");
+  // CSP: No unsafe-inline for scripts — React built by Vite uses no inline scripts.
+  // unsafe-inline on style-src is still needed for dynamic CSS-in-JS patterns.
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'");
   
   if (process.env.NODE_ENV === 'production') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');

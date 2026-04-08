@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useAuth } from '../../auth/useAuth';
 import { Trash2, Loader2 } from 'lucide-react';
@@ -36,7 +36,7 @@ export function MissionsPage() {
   const [hours, setHours] = useState('');
   const [performedAt, setPerformedAt] = useState('');
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [missRes, projRes, collRes] = await Promise.all([
         api.get<{ data: Mission[] }>('/missions'),
@@ -58,13 +58,13 @@ export function MissionsPage() {
         })));
       }
     } catch (err) {
-      console.error("Failed to load missions data", err);
+      console.error('[MissionsPage] Failed to load data:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   const filteredMissions = missions.filter(m => {
     const s = search.toLowerCase();

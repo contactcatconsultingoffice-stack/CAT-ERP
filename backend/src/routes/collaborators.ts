@@ -41,20 +41,24 @@ router.get('/', requireAuth, requireAdmin, asyncHandler(async (req: Request, res
 router.post('/', requireAuth, requireAdmin, validateRequest(CollaboratorSchema), asyncHandler(async (req: any, res: Response) => {
   const { email, name, password, expertise, socialHandle, phone } = req.body;
   const passwordHash = await bcrypt.hash(password || 'cat-erp-2024', 12);
-  const user = await prisma.user.create({
-    data: {
-      email, name, passwordHash,
-      role: 'COLLABORATOR',
-      collaborator: { create: { expertise, socialHandle, phone } }
-    },
-    include: { collaborator: true }
-  });
-  await logAction(req.user!.sub, 'CREATE', 'COLLABORATOR', user.id, `Création du collaborateur ${name}`);
 
-  // Send welcome email asynchronously
+  // Atomic transaction: if collaborator creation fails, the user is also rolled back
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: { email, name, passwordHash, role: 'COLLABORATOR' }
+    });
+    const collaborator = await tx.collaborator.create({
+      data: { userId: user.id, expertise, socialHandle, phone }
+    });
+    return { user, collaborator };
+  });
+
+  await logAction(req.user!.sub, 'CREATE', 'COLLABORATOR', result.user.id, `Création du collaborateur ${name}`);
+
+  // Send welcome email asynchronously (outside transaction)
   void sendWelcomeEmail(email, password || 'cat-erp-2024', name, 'COLLABORATOR');
 
-  res.status(201).json(user.collaborator);
+  res.status(201).json(result.collaborator);
 }));
 
 router.put('/:id', requireAuth, requireAdmin, asyncHandler(async (req: any, res: Response) => {

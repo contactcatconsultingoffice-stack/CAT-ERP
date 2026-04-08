@@ -71,7 +71,8 @@ export function CommentsPanel({ entityType, entityId }: Props) {
         `/comments?entityType=${entityType}&entityId=${entityId}`
       );
       setComments(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err) {
+      console.error('[CommentsPanel] Failed to load comments:', err);
       // silently fail
     } finally {
       setLoading(false);
@@ -100,10 +101,8 @@ export function CommentsPanel({ entityType, entityId }: Props) {
       });
       setComments(prev => [...prev, newComment]);
       setText('');
-    } catch {
-      // silently fail
-    } finally {
-      setSending(false);
+    } catch (err) {
+      console.error('[CommentsPanel] Failed to send comment:', err);
     }
   };
 
@@ -111,8 +110,8 @@ export function CommentsPanel({ entityType, entityId }: Props) {
     try {
       await api.delete(`/comments/${id}`);
       setComments(prev => prev.filter(c => c.id !== id));
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error('[CommentsPanel] Failed to delete comment:', err);
     }
   };
 
