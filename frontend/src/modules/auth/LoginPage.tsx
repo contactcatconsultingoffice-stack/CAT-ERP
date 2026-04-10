@@ -32,13 +32,9 @@ export function LoginPage() {
       if (res.requires2FASetup) {
         setPreAuthToken(res.preAuthToken);
         // Fetch setup details
-        const setupRes = await fetch('/api/auth/2fa/setup', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${res.preAuthToken}`
-          }
+        const setupData = await api.post<any>('/auth/2fa/setup', {
+          preAuthToken: res.preAuthToken
         });
-        const setupData = await setupRes.json();
         setQrCodeUrl(setupData.qrCodeUrl);
         setSecret(setupData.secret);
         setRequiresSetup(true);
@@ -69,19 +65,6 @@ export function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      if (requiresSetup) {
-        // Use the verify endpoint to complete the setup
-        const verifyRes = await fetch('/api/auth/2fa/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${preAuthToken}`
-          },
-          body: JSON.stringify({ token: twoFactorCode })
-        });
-        if (!verifyRes.ok) throw new Error('Code invalide');
-      }
-
       const res = await api.post<any>('/auth/2fa/login', {
         token: twoFactorCode,
         preAuthToken

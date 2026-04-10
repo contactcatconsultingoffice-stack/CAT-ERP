@@ -80,6 +80,52 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   return next();
 }
 
+export function require2FASetupAuth(req: Request, res: Response, next: NextFunction) {
+  // 1. Try to authenticate via Cookie (for users setting up 2FA from their Dashboard)
+  const cookieToken = (req as any).cookies?.token;
+  if (cookieToken) {
+    try {
+      req.user = jwt.verify(cookieToken, EFFECTIVE_SECRET) as JwtPayload;
+      return next();
+    } catch {
+      // Fall through to try Bearer
+    }
+  }
+
+  // 2. Try to authenticate via Bearer token (for SuperAdmins forced to setup 2FA during Login)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const bearerToken = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(bearerToken, EFFECTIVE_SECRET) as JwtPayload;
+      // Ensure the Bearer token is strictly a partial auth token to avoid abuse
+      if (!decoded.isPartial) {
+        return res.status(401).json({ error: 'Token invalide pour la phase d\'authentification partielle.' });
+      }
+      req.user = decoded;
+      return next();
+    } catch {
+      return res.status(401).json({ error: 'Session de pré-authentification invalide ou expirée.' });
+    }
+  }
+
+  // 3. Try to authenticate via preAuthToken in body (for frontend api client)
+  if (req.body && req.body.preAuthToken) {
+    try {
+      const decoded = jwt.verify(req.body.preAuthToken, EFFECTIVE_SECRET) as JwtPayload;
+      if (!decoded.isPartial) {
+        return res.status(401).json({ error: 'Token invalide pour la phase d\'authentification partielle.' });
+      }
+      req.user = decoded;
+      return next();
+    } catch {
+      return res.status(401).json({ error: 'Session de pré-authentification invalide ou expirée.' });
+    }
+  }
+
+  return res.status(401).json({ error: 'Non authentifié.' });
+}
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Non authentifié.' });

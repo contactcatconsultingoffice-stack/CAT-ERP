@@ -2,11 +2,11 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { prisma } from '../prisma';
-import { signToken, setAuthCookie, clearAuthCookie, requireAuth, verifyToken, getUserFromRequest } from '../auth'; 
+import { signToken, setAuthCookie, clearAuthCookie, requireAuth, require2FASetupAuth, verifyToken, getUserFromRequest } from '../auth'; 
 import { authRateLimiter, asyncHandler } from '../middleware/security';
 import { logAction } from '../utils/audit';
 import { transporter } from '../utils/email';
-import { generateSecret, generateURI, verify } from 'otplib';
+import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 
 const router = express.Router();
@@ -107,18 +107,47 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
     }
 
     const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
-    if (!user || !user.twoFactorSecret || !user.twoFactorEnabled) {
-      return res.status(401).json({ error: '2FA non activé ou utilisateur introuvable.' });
+    if (!user || !user.twoFactorSecret) {
+      return res.status(401).json({ error: '2FA non configuré ou utilisateur introuvable.' });
     }
 
-    // verify with an epochTolerance of 60 seconds (prevents clock drift issues of +/- 60 seconds)
-    const { valid: isValid } = await verify({ 
-      token, 
-      secret: user.twoFactorSecret as string,
-      epochTolerance: 60
+    if (!user.twoFactorEnabled && !decoded.setupRequired) {
+      return res.status(401).json({ error: '2FA non activé.' });
+    }
+
+    // File-based Debug Logging for 2FA issue
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = path.join(process.cwd(), '2fa_debug.log');
+    const logEntry = `
+[${new Date().toISOString()}] 2FA LOGIN ATTEMPT
+User ID: ${user.id}
+Token: "${token}" (Length: ${token?.length})
+Secret Length: ${user.twoFactorSecret?.length}
+Server Time (ms): ${Date.now()}
+`;
+    fs.appendFileSync(logPath, logEntry);
+
+    // verify with a window of 2 (prevents clock drift issues of +/- 60 seconds)
+    const isValid = speakeasy.totp.verify({ 
+      token: String(token).trim(), 
+      secret: String(user.twoFactorSecret).trim(),
+      encoding: 'base32',
+      window: 2
     });
 
+    fs.appendFileSync(logPath, `Verification Result: ${isValid}\n-------------------\n`);
+
     if (!isValid) return res.status(401).json({ error: 'Code 2FA invalide.' });
+
+    // Auto-enable 2FA if it was pending setup
+    if (!user.twoFactorEnabled) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { twoFactorEnabled: true }
+      });
+      await logAction(user.id, 'UPDATE', 'USER', user.id, '2FA activé avec succès lors de la connexion');
+    }
 
     const permissions = user.permissions || [];
     const finalToken = signToken({ 
@@ -150,32 +179,35 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
   }
 }));
 
-router.post('/2fa/setup', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.post('/2fa/setup', require2FASetupAuth, asyncHandler(async (req: Request, res: Response) => {
   const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
   if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé.' });
 
-  const secret = generateSecret();
-  const issuer = 'CAT ERP';
-  const otpauth = generateURI({ label: user.email, issuer, secret });
+  const secret = speakeasy.generateSecret({ 
+    issuer: 'CAT ERP', 
+    name: `CAT ERP (${user.email})` 
+  });
+  const otpauth = secret.otpauth_url || '';
   const qrCodeUrl = await QRCode.toDataURL(otpauth);
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { twoFactorSecret: secret }
+    data: { twoFactorSecret: secret.base32 }
   });
 
-  res.json({ qrCodeUrl, secret });
+  res.json({ qrCodeUrl, secret: secret.base32 });
 }));
 
-router.post('/2fa/verify', requireAuth, asyncHandler(async (req: Request, res: Response) => {
+router.post('/2fa/verify', require2FASetupAuth, asyncHandler(async (req: Request, res: Response) => {
   const { token } = req.body;
   const user = await prisma.user.findUnique({ where: { id: req.user!.sub } });
   if (!user || !user.twoFactorSecret) return res.status(400).json({ error: '2FA non configuré.' });
 
-  const { valid: isValid } = await verify({ 
-    token, 
-    secret: user.twoFactorSecret, 
-    epochTolerance: 60 
+  const isValid = speakeasy.totp.verify({ 
+    token: String(token).trim(), 
+    secret: String(user.twoFactorSecret).trim(), 
+    encoding: 'base32',
+    window: 2 
   });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
@@ -195,10 +227,11 @@ router.post('/2fa/disable', requireAuth, asyncHandler(async (req: Request, res: 
     return res.status(400).json({ error: '2FA n’est pas activé.' });
   }
 
-  const { valid: isValid } = await verify({ 
-    token, 
-    secret: user.twoFactorSecret, 
-    epochTolerance: 60 
+  const isValid = speakeasy.totp.verify({ 
+    token: String(token).trim(), 
+    secret: String(user.twoFactorSecret).trim(), 
+    encoding: 'base32',
+    window: 2 
   });
   if (!isValid) return res.status(400).json({ error: 'Code invalide.' });
 
