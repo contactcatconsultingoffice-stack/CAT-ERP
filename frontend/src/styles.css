@@ -700,6 +700,31 @@ select {
   padding-right: 2.5rem;
 }
 
+/* ─────────────────────────────────────────────
+   SELECT OPTIONS — DARK MODE FIX
+───────────────────────────────────────────── */
+select option {
+  background: #0c1420;
+  color: #eef2ff;
+  font-size: 0.9rem;
+}
+
+select optgroup {
+  background: #0c1420;
+  color: #8b98b8;
+  font-weight: 700;
+}
+
+.light-theme select option {
+  background: #ffffff;
+  color: #0d1526;
+}
+
+.light-theme select optgroup {
+  background: #f4f7fd;
+  color: #4b5980;
+}
+
 textarea {
   resize: vertical;
   min-height: 100px;
