@@ -2,6 +2,15 @@ node_modules
 dist
 .env
 *.log
-docker-compose*
-Dockerfile
 .git
+.gitignore
+README.md
+Dockerfile
+docker-compose.yml
+npx
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vscode
+.idea
+.DS_Store

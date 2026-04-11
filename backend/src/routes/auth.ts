@@ -115,19 +115,6 @@ router.post('/2fa/login', authRateLimiter, asyncHandler(async (req: Request, res
       return res.status(401).json({ error: '2FA non activé.' });
     }
 
-    // File-based Debug Logging for 2FA issue
-    const fs = require('fs');
-    const path = require('path');
-    const logPath = path.join(process.cwd(), '2fa_debug.log');
-    const logEntry = `
-[${new Date().toISOString()}] 2FA LOGIN ATTEMPT
-User ID: ${user.id}
-Token: "${token}" (Length: ${token?.length})
-Secret Length: ${user.twoFactorSecret?.length}
-Server Time (ms): ${Date.now()}
-`;
-    fs.appendFileSync(logPath, logEntry);
-
     // verify with a window of 2 (prevents clock drift issues of +/- 60 seconds)
     const isValid = speakeasy.totp.verify({ 
       token: String(token).trim(), 
@@ -135,8 +122,6 @@ Server Time (ms): ${Date.now()}
       encoding: 'base32',
       window: 2
     });
-
-    fs.appendFileSync(logPath, `Verification Result: ${isValid}\n-------------------\n`);
 
     if (!isValid) return res.status(401).json({ error: 'Code 2FA invalide.' });
 

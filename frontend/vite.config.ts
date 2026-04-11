@@ -10,6 +10,9 @@ export default defineConfig({
     react(),
     ...(!isElectron ? [VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5 MiB
+      },
       devOptions: {
         enabled: true
       },
