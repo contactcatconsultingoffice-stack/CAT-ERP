@@ -97,6 +97,6 @@ app.all('/api/*', (_req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Backend API listening on http://localhost:${PORT}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`Backend API listening on http://0.0.0.0:${PORT}`);
 });
